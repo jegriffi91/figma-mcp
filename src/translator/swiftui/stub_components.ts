@@ -63,6 +63,26 @@ export class StubButtonTranslator implements ComponentTranslator {
     }
 
     private getButtonVariant(node: FigmaNode): string {
+        // Priority 1: Check componentProperties for VARIANT type (P2)
+        if (node.componentProperties) {
+            // Look for common variant property names
+            const variantKeys = ['Style', 'Type', 'Variant', 'Configuration'];
+            for (const key of variantKeys) {
+                const prop = node.componentProperties[key];
+                if (prop?.type === 'VARIANT' && typeof prop.value === 'string') {
+                    const value = prop.value.toLowerCase();
+                    if (value.includes('secondary')) return 'secondary';
+                    if (value.includes('tertiary')) return 'tertiary';
+                    if (value.includes('primary')) return 'primary';
+                    // Use the variant value directly if it's a known style
+                    if (['primary', 'secondary', 'tertiary', 'ghost', 'link', 'destructive'].includes(value)) {
+                        return value;
+                    }
+                }
+            }
+        }
+
+        // Priority 2: Fall back to componentId/name-based detection
         const id = node.componentId?.toLowerCase() ?? '';
         const name = (node.componentName ?? node.name).toLowerCase();
 

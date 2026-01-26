@@ -3,11 +3,12 @@ export type FigmaLayoutMode = 'NONE' | 'HORIZONTAL' | 'VERTICAL';
 
 // Figma Alignment
 export type FigmaAlignItems =
-    | 'MIN'      // Start (leading)
-    | 'CENTER'   // Center
-    | 'MAX'      // End (trailing)
-    | 'BASELINE' // Text baseline (for horizontal layouts)
-    | 'STRETCH'; // Stretch to fill
+    | 'MIN'           // Start (leading)
+    | 'CENTER'        // Center
+    | 'MAX'           // End (trailing)
+    | 'BASELINE'      // Text baseline (for horizontal layouts)
+    | 'STRETCH'       // Stretch to fill
+    | 'SPACE_BETWEEN'; // Distribute with space between
 
 // Figma Color (0-1 RGBA)
 export interface FigmaColor {
@@ -61,6 +62,30 @@ export interface FigmaBlurEffect {
 
 export type FigmaEffect = FigmaShadowEffect | FigmaBlurEffect;
 
+// Layout Sizing (child behavior in Auto Layout)
+export type FigmaLayoutSizing = 'HUG' | 'FILL' | 'FIXED';
+
+// Variable Alias (token reference from Figma Variables)
+export interface FigmaVariableAlias {
+    type: 'VARIABLE_ALIAS';
+    id: string;  // e.g., "VariableID:54778:426"
+}
+
+// Component Property (for INSTANCE nodes with variants)
+export interface FigmaComponentProperty {
+    type: 'VARIANT' | 'BOOLEAN' | 'INSTANCE_SWAP' | 'TEXT';
+    value: string | boolean;
+    preferredValues?: string[];
+    boundVariables?: Record<string, unknown>;
+}
+
+// Bound Variables on fills (for token resolution)
+export interface FigmaSolidFillWithBinding extends FigmaSolidFill {
+    boundVariables?: {
+        color?: FigmaVariableAlias;
+    };
+}
+
 // Main FigmaNode interface
 export interface FigmaNode {
     id: string;
@@ -113,6 +138,25 @@ export interface FigmaNode {
         width: number;
         height: number;
     };
+
+    // Layout Sizing (child behavior in Auto Layout) - P0
+    layoutSizingHorizontal?: FigmaLayoutSizing;
+    layoutSizingVertical?: FigmaLayoutSizing;
+    layoutPositioning?: 'AUTO' | 'ABSOLUTE';
+    layoutAlign?: 'INHERIT' | 'STRETCH';
+    layoutGrow?: number;
+
+    // Clipping - P1
+    clipsContent?: boolean;
+
+    // Bound Variables (token references) - P1
+    boundVariables?: {
+        fills?: FigmaVariableAlias[];
+        strokes?: FigmaVariableAlias[];
+    };
+
+    // Component Properties (for INSTANCE nodes) - P2
+    componentProperties?: Record<string, FigmaComponentProperty>;
 }
 
 export interface FigmaDataSource {

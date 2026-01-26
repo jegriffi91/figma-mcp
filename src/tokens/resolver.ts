@@ -14,10 +14,11 @@ import {
     TokenResolutionResult,
 } from './types';
 import { stubTokenDefinitions } from './stub_definitions';
-import { FigmaTextStyle, FigmaColor } from '../figma/types';
+import { FigmaTextStyle, FigmaColor, FigmaSolidFillWithBinding } from '../figma/types';
 
 export class DesignTokenResolver {
     private definitions: DesignTokenDefinitions;
+    private variableMapping: Map<string, string> = new Map();
 
     // Tolerance for matching (how close a value must be to match)
     private static SPACING_TOLERANCE = 2;    // pixels
@@ -26,6 +27,21 @@ export class DesignTokenResolver {
 
     constructor(definitions?: DesignTokenDefinitions) {
         this.definitions = definitions ?? stubTokenDefinitions;
+    }
+
+    /**
+     * Set variable ID → token name mapping
+     * This allows direct resolution from Figma's boundVariables
+     */
+    setVariableMapping(mapping: Record<string, string>) {
+        this.variableMapping = new Map(Object.entries(mapping));
+    }
+
+    /**
+     * Resolve a Figma variable ID to a token name
+     */
+    resolveVariableId(variableId: string): string | undefined {
+        return this.variableMapping.get(variableId);
     }
 
     /**
@@ -80,6 +96,51 @@ export class DesignTokenResolver {
             message: `⚠️ No DS color token found for ${hex}.`,
             closestMatches: closest.map(t => ({ name: t.name, value: this.colorToHex(t) })),
         };
+    }
+
+    /**
+     * Resolve a Figma fill with potential variable binding (P1)
+     * Checks boundVariables first, then falls back to raw color matching
+     */
+    resolveColorWithBinding(fill: FigmaSolidFillWithBinding): TokenResolutionResult<ColorToken> {
+        // Priority 1: Check for variable binding
+        if (fill.boundVariables?.color) {
+            const variableId = fill.boundVariables.color.id;
+            const tokenName = this.resolveVariableId(variableId);
+
+            if (tokenName) {
+                // Find the token in definitions to get full info
+                const token = this.definitions.colors.find(t => t.name === tokenName);
+                if (token) {
+                    return {
+                        success: true,
+                        token,
+                        swiftUIValue: token.name,
+                    };
+                }
+                // Token name mapped but not in definitions - still use it
+                return {
+                    success: true,
+                    token: { name: tokenName, r: fill.color.r, g: fill.color.g, b: fill.color.b },
+                    swiftUIValue: tokenName,
+                };
+            }
+
+            // Variable ID not mapped - add guidance
+            const hex = this.colorToHex(fill.color);
+            return {
+                success: false,
+                rawValue: hex,
+                message: `⚠️ Variable ${variableId} not mapped. Add to variable_mapping.json.`,
+                closestMatches: this.getClosestColorMatches(fill.color, 2).map(t => ({
+                    name: t.name,
+                    value: this.colorToHex(t)
+                })),
+            };
+        }
+
+        // Priority 2: Fall back to raw color matching
+        return this.resolveColor(fill.color);
     }
 
     /**

@@ -1,0 +1,7 @@
+{
+    "// Instructions": "Map Figma Variable IDs to your DS token names. Get IDs from boundVariables in Figma node responses.",
+    "// Example": "VariableID:54778:426 → DSColor.background",
+    "VariableID:54778:426": "DSColor.background",
+    "VariableID:54778:427": "DSColor.textPrimary",
+    "VariableID:54778:431": "DSColor.border"
+}

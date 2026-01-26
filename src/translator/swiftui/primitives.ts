@@ -52,9 +52,27 @@ export class FrameTranslator implements ComponentTranslator {
                 indentionLevel: context.indentionLevel + 1,
             };
 
-            for (const child of node.children) {
+            // Check if we need to add Spacers for SPACE_BETWEEN
+            const useSpaceBetween = node.primaryAxisAlignItems === 'SPACE_BETWEEN';
+
+            for (let i = 0; i < node.children.length; i++) {
+                const child = node.children[i];
+
+                // Skip absolutely positioned children (handled separately)
+                if (child.layoutPositioning === 'ABSOLUTE') {
+                    continue;
+                }
+
                 const childCode = context.registry.translate(child, childContext);
-                lines.push(childCode);
+
+                // Add frame modifiers for FILL sizing
+                const childWithSizing = this.wrapChildWithSizing(childCode, child, childIndent);
+                lines.push(childWithSizing);
+
+                // Insert Spacer between children for SPACE_BETWEEN
+                if (useSpaceBetween && i < node.children.length - 1) {
+                    lines.push(`${childIndent}Spacer()`);
+                }
             }
         }
 
@@ -124,6 +142,10 @@ export class FrameTranslator implements ComponentTranslator {
     private buildModifiers(node: FigmaNode, context: TranslationContext, indent: string): string[] {
         const modifiers: string[] = [];
 
+        // Frame sizing (for this node as a child)
+        const frameSizing = this.buildFrameSizingModifier(node);
+        if (frameSizing) modifiers.push(frameSizing);
+
         // Padding
         const padding = this.buildPaddingModifier(node, context);
         if (padding) modifiers.push(padding);
@@ -136,12 +158,63 @@ export class FrameTranslator implements ComponentTranslator {
         const radius = this.buildCornerRadiusModifier(node, context);
         if (radius) modifiers.push(radius);
 
+        // Clipping (P1)
+        if (node.clipsContent) {
+            modifiers.push('.clipped()');
+        }
+
         // Opacity
         if (node.opacity !== undefined && node.opacity < 1) {
             modifiers.push(`.opacity(${node.opacity.toFixed(2)})`);
         }
 
         return modifiers;
+    }
+
+    /**
+     * Wraps child code with sizing modifiers based on layoutSizingHorizontal/Vertical
+     */
+    private wrapChildWithSizing(childCode: string, child: FigmaNode, indent: string): string {
+        const sizingModifiers: string[] = [];
+
+        // Horizontal sizing
+        if (child.layoutSizingHorizontal === 'FILL') {
+            sizingModifiers.push('.frame(maxWidth: .infinity)');
+        }
+
+        // Vertical sizing
+        if (child.layoutSizingVertical === 'FILL') {
+            sizingModifiers.push('.frame(maxHeight: .infinity)');
+        }
+
+        if (sizingModifiers.length === 0) {
+            return childCode;
+        }
+
+        // Append modifiers to the last line of childCode
+        const lines = childCode.split('\n');
+        const lastLineIndex = lines.length - 1;
+        for (const mod of sizingModifiers) {
+            lines.push(`${indent}    ${mod}`);
+        }
+        return lines.join('\n');
+    }
+
+    /**
+     * Build frame sizing modifier for this node based on its layoutSizing properties
+     */
+    private buildFrameSizingModifier(node: FigmaNode): string | null {
+        const parts: string[] = [];
+
+        if (node.layoutSizingHorizontal === 'FILL') {
+            parts.push('maxWidth: .infinity');
+        }
+        if (node.layoutSizingVertical === 'FILL') {
+            parts.push('maxHeight: .infinity');
+        }
+
+        if (parts.length === 0) return null;
+        return `.frame(${parts.join(', ')})`;
     }
 
     private buildPaddingModifier(node: FigmaNode, context: TranslationContext): string | null {
