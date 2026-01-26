@@ -50,11 +50,20 @@ export class StubButtonTranslator implements ComponentTranslator {
         // Determine button variant from componentId or name
         const variant = this.getButtonVariant(node);
 
-        // Extract label from children
-        let label = this.extractLabel(node);
+        // Extract label from children or component properties
+        let label = this.getOverriddenLabel(node) ?? this.extractLabel(node);
+
+        // Check for disabled state
+        const isDisabled = this.getIsDisabled(node);
 
         // Generate appropriate DSButton call
-        return `${indent}DSButton(title: "${label}", style: .${variant}, action: {})`;
+        let code = `${indent}DSButton(title: "${label}", style: .${variant}, action: {})`;
+
+        if (isDisabled) {
+            code += `\n${indent}    .disabled(true)`;
+        }
+
+        return code;
     }
 
     private isButtonComponent(componentId: string): boolean {
@@ -93,6 +102,46 @@ export class StubButtonTranslator implements ComponentTranslator {
             return 'tertiary';
         }
         return 'primary';
+    }
+
+    private getOverriddenLabel(node: FigmaNode): string | undefined {
+        if (!node.componentProperties) return undefined;
+
+        // Look for common text property names
+        const textKeys = ['Label', 'Text', 'Title', 'Content', 'Button Text'];
+        for (const key of textKeys) {
+            const prop = node.componentProperties[key];
+            if (prop?.type === 'TEXT' && typeof prop.value === 'string') {
+                return prop.value.replace(/"/g, '\\"');
+            }
+        }
+        return undefined;
+    }
+
+    private getIsDisabled(node: FigmaNode): boolean {
+        if (!node.componentProperties) return false;
+
+        // Check BOOLEAN properties
+        const boolKeys = ['Disabled', 'Is Disabled', 'State: Disabled'];
+        for (const key of boolKeys) {
+            const prop = node.componentProperties[key];
+            if (prop?.type === 'BOOLEAN' && prop.value === true) {
+                return true;
+            }
+        }
+
+        // Check VARIANT properties (e.g. State=Disabled)
+        const stateKeys = ['State', 'Status'];
+        for (const key of stateKeys) {
+            const prop = node.componentProperties[key];
+            if (prop?.type === 'VARIANT' && typeof prop.value === 'string') {
+                if (prop.value.toLowerCase() === 'disabled') {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private extractLabel(node: FigmaNode): string {

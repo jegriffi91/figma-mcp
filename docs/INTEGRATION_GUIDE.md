@@ -273,3 +273,58 @@ export const stubTokenDefinitions: DesignTokenDefinitions = {
 ```
 
 The resolver uses **tolerance matching** to find the closest token, so exact matches aren't required.
+
+---
+
+## 7. FAQ & Common Patterns
+
+### How can I find the diff between my SwiftUI design and what's on Figma?
+
+Since the MCP tool generates text, the "diff" is structural rather than visual.
+
+1.  **Ask the LLM**: "Does the generated code match the design properties?"
+    -   This triggers the LLM to re-analyze the Figma node JSON (fills, padding, alignment) and compare it against the generated SwiftUI.
+2.  **Visual Diff**: Use Xcode Previews side-by-side with your Figma window.
+3.  **Property Inspection**: Use the `figma_to_swiftui` tool on a specific node ID to see exactly what the server sees.
+    -   Example: "Debug the padding on node 1:2" will show you the raw JSON if the model chooses to inspect it.
+
+### My component encounters custom implementations (e.g., GeometryReader)
+
+If a component requires complex layout logic that standard stacks (HStack/VStack) cannot handle, you have two options:
+
+**Option A: Custom Translator (Robust)**
+Write a specific translator for that component ID or name pattern.
+
+```typescript
+export class ChartTranslator implements ComponentTranslator {
+    canHandle(node: FigmaNode): boolean {
+        // Match a specific group or frame name
+        return node.name === "ComplexChartContainer";
+    }
+
+    translate(node: FigmaNode, context: TranslationContext): string {
+        // Emit custom SwiftUI that uses GeometryReader
+        return `
+        GeometryReader { proxy in
+            CustomChartView(width: proxy.size.width)
+        }`;
+    }
+}
+```
+
+**Option B: "Escape Hatch" in FrameTranslator**
+Modify `FrameTranslator` to detect specific markers (e.g., a frame named `__USE_GEOMETRY_READER__`) and change output accordingly.
+
+### Working around Variance (Custom Modifiers)
+
+If your codebase relies on custom view modifiers (e.g., `.dsStyle(.card)` instead of discrete padding/background modifiers):
+
+1.  **Update `FrameTranslator`**: modify `buildModifiers` to output your custom modifier.
+2.  **Create a Wrapper**: Instead of generating `VStack`, generate `DSCardView { VStack ... }` via a custom `DSCardTranslator`.
+
+### How do I handle new Figma features (e.g. Min/Max Width)?
+
+The MCP server needs type definitions updated to support new Figma API fields.
+1.  Add the property to `src/figma/types.ts`.
+2.  Update `FrameTranslator` or `primitives.ts` to read that property and emit usage code.
+

@@ -15,8 +15,31 @@ export class FrameTranslator implements ComponentTranslator {
         const indent = '    '.repeat(context.indentionLevel);
         const childIndent = '    '.repeat(context.indentionLevel + 1);
 
-        // Determine stack type based on layoutMode
+        // Separate children into flow (regular) and absolute (positioned)
+        const allChildren = node.children || [];
+        const flowChildren = allChildren.filter(c => c.layoutPositioning !== 'ABSOLUTE');
+        const absoluteChildren = allChildren.filter(c => c.layoutPositioning === 'ABSOLUTE');
+
+        // Determine if we need a ZStack wrapper (for absolute children)
+        // If the layoutMode is NONE, it's already a ZStack, so we don't wrap, just treat all as flow (or handled by ZStack logic)
+        // Actually, if layoutMode is NONE, getStackType returns ZStack.
+        // But for Auto Layout (VERTICAL/HORIZONTAL), we need to wrap if there are absolute children.
         const stackType = this.getStackType(node);
+        const isAutoLayout = node.layoutMode === 'VERTICAL' || node.layoutMode === 'HORIZONTAL';
+        const needsWrapper = isAutoLayout && absoluteChildren.length > 0;
+
+        // If wrapping, start with ZStack
+        if (needsWrapper) {
+            lines.push(`${indent}ZStack(alignment: .topLeading) {`);
+            // We increase indentation for the inner content
+            // However, to keep variable scopes simple, we'll just manually manage indentation strings for lines we push
+            // or we could update context. But context is passed to recursive calls.
+        }
+
+        const effectiveIndent = needsWrapper ? childIndent : indent;
+        const effectiveChildIndent = needsWrapper ? '    '.repeat(context.indentionLevel + 2) : childIndent;
+
+        // --- Build Main Flow Stack ---
 
         // Resolve spacing
         const spacingResult = node.itemSpacing !== undefined
@@ -30,9 +53,9 @@ export class FrameTranslator implements ComponentTranslator {
                 spacingParam = `, spacing: ${spacingResult.swiftUIValue}`;
             } else {
                 // Add warning as comment
-                lines.push(`${indent}// ${spacingResult.message}`);
+                lines.push(`${effectiveIndent}// ${spacingResult.message}`);
                 if (spacingResult.closestMatches?.length) {
-                    lines.push(`${indent}// Closest: ${spacingResult.closestMatches.map(m => `${m.name} (${m.value})`).join(', ')}`);
+                    lines.push(`${effectiveIndent}// Closest: ${spacingResult.closestMatches.map(m => `${m.name} (${m.value})`).join(', ')}`);
                 }
                 spacingParam = `, spacing: ${node.itemSpacing!}`; // Fall back to raw value
             }
@@ -41,57 +64,110 @@ export class FrameTranslator implements ComponentTranslator {
         // Build alignment parameter
         const alignment = this.getAlignment(node, stackType);
 
-        // Open stack
-        lines.push(`${indent}${stackType}(alignment: ${alignment}${spacingParam}) {`);
+        // Open stack (VStack/HStack/ZStack)
+        lines.push(`${effectiveIndent}${stackType}(alignment: ${alignment}${spacingParam}) {`);
 
-        // Translate children
-        if (node.children) {
+        // Translate flow children
+        if (flowChildren.length > 0) {
             const childContext: TranslationContext = {
                 ...context,
                 depth: context.depth + 1,
-                indentionLevel: context.indentionLevel + 1,
+                indentionLevel: context.indentionLevel + (needsWrapper ? 2 : 1),
             };
 
             // Check if we need to add Spacers for SPACE_BETWEEN
             const useSpaceBetween = node.primaryAxisAlignItems === 'SPACE_BETWEEN';
 
-            for (let i = 0; i < node.children.length; i++) {
-                const child = node.children[i];
-
-                // Skip absolutely positioned children (handled separately)
-                if (child.layoutPositioning === 'ABSOLUTE') {
-                    continue;
-                }
+            for (let i = 0; i < flowChildren.length; i++) {
+                const child = flowChildren[i];
 
                 const childCode = context.registry.translate(child, childContext);
 
                 // Add frame modifiers for FILL sizing
-                const childWithSizing = this.wrapChildWithSizing(childCode, child, childIndent);
+                const childWithSizing = this.wrapChildWithSizing(childCode, child, effectiveChildIndent);
                 lines.push(childWithSizing);
 
                 // Insert Spacer between children for SPACE_BETWEEN
-                if (useSpaceBetween && i < node.children.length - 1) {
-                    lines.push(`${childIndent}Spacer()`);
+                if (useSpaceBetween && i < flowChildren.length - 1) {
+                    lines.push(`${effectiveChildIndent}Spacer()`);
                 }
             }
         }
 
         // Close stack
-        lines.push(`${indent}}`);
+        lines.push(`${effectiveIndent}}`);
 
-        // Add modifiers
+        // --- End Main Flow Stack ---
+
+        // --- Handle Absolute Children ---
+        if (needsWrapper) {
+            const absChildContext: TranslationContext = {
+                ...context,
+                depth: context.depth + 1,
+                indentionLevel: context.indentionLevel + 1,
+            };
+
+            for (const child of absoluteChildren) {
+                const childCode = context.registry.translate(child, absChildContext);
+
+                // Calculate Offset
+                let offsetModifiers = '';
+                if (child.absoluteBoundingBox && node.absoluteBoundingBox) {
+                    const x = child.absoluteBoundingBox.x - node.absoluteBoundingBox.x;
+                    const y = child.absoluteBoundingBox.y - node.absoluteBoundingBox.y;
+                    // Round to reasonable precision
+                    const rX = Math.round(x * 10) / 10;
+                    const rY = Math.round(y * 10) / 10;
+                    offsetModifiers = `\n${childIndent}    .offset(x: ${rX}, y: ${rY})`;
+                }
+
+                // Append .offset to the last line of childCode is tricky if we don't parse it.
+                // But wrapChildWithSizing logic appends lines.
+                // We can just append the offset line.
+                lines.push(childCode + offsetModifiers);
+            }
+
+            // Close ZStack
+            lines.push(`${indent}}`);
+        }
+
+        // Add modifiers (Padding, Background, etc.)
+        // These apply to the OUTERMOST container (ZStack if wrapped, or the Flow Stack if not)
         const modifiers = this.buildModifiers(node, context, indent);
         if (modifiers.length > 0) {
-            // Remove the closing brace, add modifiers, then close
+            // Remove the closing brace, add modifiers, then close?
+            // Wait, existing logic:
+            /*
+            const lastLine = lines.pop()!;
+            lines.push(lastLine); // This does nothing? Ah, it pushes back the '}' ?
+            for (const mod of modifiers) { lines.push(...) }
+            */
+            // The existing logic doesn't seemingly attach modifiers *to* the brace correctly
+            // It just pushes lines.
+            // Correct SwiftUI:
+            // Stack {
+            // }
+            // .mod()
+            // .mod()
+
+            // So we just push the modifiers at `indent` level.
+            // The existing logic had:
+            /*
             const lastLine = lines.pop()!;
             lines.push(lastLine);
+            for (const mod of modifiers) ...
+            */
+            // This suggests it was just ensuring we are at the end.
+
             for (const mod of modifiers) {
                 lines.push(`${indent}${mod}`);
             }
         }
 
         // Add node name as comment for debugging
-        lines[lines.length - 1] += ` // ${node.name}`;
+        if (lines.length > 0) {
+            lines[lines.length - 1] += ` // ${node.name}`;
+        }
 
         return lines.join('\n');
     }
