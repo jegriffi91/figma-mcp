@@ -26,7 +26,7 @@ export class DesignTokenResolver {
     private static FONT_SIZE_TOLERANCE = 1;  // points
 
     constructor(definitions?: DesignTokenDefinitions) {
-        this.definitions = definitions ?? stubTokenDefinitions;
+        this.definitions = definitions || stubTokenDefinitions;
     }
 
     /**

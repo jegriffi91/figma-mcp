@@ -1,0 +1,13 @@
+{
+    "components": [
+        {
+            "figmaId": "test:button",
+            "swiftView": "DSButton",
+            "sourceFile": "Sources/DesignSystem/Button/DSButton.swift",
+            "params": {
+                "Label": "title",
+                "Variant": "style"
+            }
+        }
+    ]
+}

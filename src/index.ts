@@ -10,8 +10,11 @@ import { z } from 'zod';
 import { config } from './config';
 import { getFigmaClient } from './figma/client';
 import { TranslatorRegistry } from './translator/registry';
+import { DesignTokenResolver } from './tokens/resolver';
 import { FrameTranslator, TextTranslator } from './translator/swiftui/primitives';
 import { StubButtonTranslator } from './translator/swiftui/stub_components';
+import { DesignSystemLoader } from './core/loader';
+import { ConfigurableComponentTranslator } from './translator/swiftui/configurable_component';
 
 /**
  * Figma MCP Server
@@ -40,7 +43,41 @@ class FigmaMcpServer {
         this.setupErrorHandling();
     }
 
+    async initialize(): Promise<void> {
+        // Load Design System Configuration
+        const loader = new DesignSystemLoader(config.designSystemRoot);
+
+        console.error(`[Init] Loading Design System from: ${config.designSystemRoot}`);
+        const tokens = await loader.loadTokens();
+        const components = await loader.loadComponents();
+
+        // Initialize Registry with loaded tokens
+        // We recreate the registry here because we need the async loaded tokens
+        // A better approach in refactor would be to make registry async or having a 'configure' method
+        const tokenResolver = new DesignTokenResolver(tokens);
+        this.registry = new TranslatorRegistry(tokenResolver);
+
+        // Register Translators
+
+        // 1. Dynamic Configurable Translator (Highest Priority for matched known IDs)
+        if (components.components.length > 0) {
+            console.error(`[Init] Registering ${components.components.length} configurable components`);
+            this.registry.register(new ConfigurableComponentTranslator(components));
+        }
+
+        // 2. Specific Code-based Stubs (Fallbacks or Special Logic)
+        this.registry.register(new StubButtonTranslator());
+
+        // 3. Generic Primitives
+        this.registry.register(new TextTranslator());
+        this.registry.register(new FrameTranslator()); // Serves as a fallback for most layout nodes
+
+        // 4. Fallback
+        this.registry.setFallback(new FrameTranslator());
+    }
+
     private initializeRegistry(): TranslatorRegistry {
+        // Initial sync registry (will be overwritten by initialize)
         const registry = new TranslatorRegistry();
 
         // Register specific components first (Strategy Pattern)
@@ -143,6 +180,7 @@ class FigmaMcpServer {
     }
 
     async run() {
+        await this.initialize();
         const transport = new StdioServerTransport();
         await this.server.connect(transport);
         console.error('Figma MCP Server running on stdio');
