@@ -105,6 +105,26 @@ This file maps Figma components to SwiftUI Views.
 }
 ```
 
+### Handoff Mode (Default: Enabled)
+
+By default, `handoffMode` is **true**, meaning the MCP generates **scaffolds with TODOs** instead of fully functional code. This is ideal for handoff to developers who need to add:
+
+- Action handlers (tap, swipe, etc.)
+- State management (@Binding, @State, ViewModel)
+- Image asset resolution
+- Custom business logic
+
+To disable handoff mode and generate full implementations:
+
+```json
+{
+  "handoffMode": false,
+  "components": [...]
+}
+```
+
+Or override per-request by passing `handoff_mode: false` to the tool.
+
 ### Field Reference
 
 | Field | Description | Example |
@@ -274,10 +294,47 @@ DSButton(title: "Submit", style: .primary)
 ┌─────────────────────────────────────────────────────────────────┐
 │                     TranslatorRegistry                          │
 ├─────────────────────────────────────────────────────────────────┤
-│  1. ConfigurableComponentTranslator (from JSON)                 │
-│  2. TextTranslator (generic TEXT nodes)                         │
-│  3. FrameTranslator (generic layout fallback)                   │
+│  1. ConfigurableComponentTranslator (known DS components)       │
+│  2. PlaceholderTranslator (unknown components → scaffold)       │
+│  3. TextTranslator (generic TEXT nodes)                         │
+│  4. FrameTranslator (generic layout fallback)                   │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 All component mappings come from `components.json`. No code changes needed.
+
+---
+
+## Handoff Mode Output Examples
+
+### Known DS Component (in `components.json`)
+
+```swift
+// HANDOFF: DSButton from Figma
+// Reference: Sources/DesignSystem/Button/DSButton.swift
+DSButton(title: "Submit", style: .primary)
+    // TODO: Add action handler
+```
+
+### Unknown Component (not in `components.json`)
+
+```swift
+// HANDOFF: Unknown component "CustomPieChart"
+// Figma Component ID: 55:9999
+// TODO: Implement CustomPieChart component
+Color.gray.opacity(0.2)
+    .frame(width: 200, height: 200)
+    .overlay(
+        Text("CustomPieChart")
+            .foregroundColor(.secondary)
+    )
+```
+
+### Developer Workflow
+
+1. **Receive scaffold** from MCP
+2. **Search for TODOs** in generated code
+3. **Implement placeholders** with actual components
+4. **Add action handlers** where indicated
+5. **Wire up state** per your architecture guidelines
+

@@ -35,7 +35,7 @@ export class DesignSystemLoader {
             return ComponentConfigurationSchema.parse(json);
         } catch (error: any) {
             console.warn(`[DesignSystemLoader] Failed to load components.json from ${this.rootPath}: ${error.message}`);
-            return { components: [] };
+            return { handoffMode: true, components: [] };
         }
     }
 }

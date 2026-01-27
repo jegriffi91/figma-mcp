@@ -7,12 +7,18 @@ import { ComponentDefinition, ComponentConfiguration } from '../../core/schemas'
  * 
  * Streamlined approach: The config just specifies the Swift View name and parameter mappings.
  * This translator generates `SwiftViewName(param1: value1, param2: value2, ...)`.
+ * 
+ * In handoff mode (default), includes TODO comments for actions and references source files.
  */
 export class ConfigurableComponentTranslator implements ComponentTranslator {
     private config: ComponentConfiguration;
 
     constructor(config: ComponentConfiguration) {
         this.config = config;
+    }
+
+    get handoffMode(): boolean {
+        return this.config.handoffMode ?? true;
     }
 
     canHandle(node: FigmaNode): boolean {
@@ -36,6 +42,16 @@ export class ConfigurableComponentTranslator implements ComponentTranslator {
             return `${indent}// Error: No definition found for component`;
         }
 
+        const lines: string[] = [];
+
+        // In handoff mode, add header comment with source reference
+        if (this.handoffMode) {
+            lines.push(`${indent}// HANDOFF: ${definition.swiftView} from Figma`);
+            if (definition.sourceFile) {
+                lines.push(`${indent}// Reference: ${definition.sourceFile}`);
+            }
+        }
+
         // Build parameter list
         const params: string[] = [];
 
@@ -48,7 +64,14 @@ export class ConfigurableComponentTranslator implements ComponentTranslator {
 
         // Generate clean SwiftUI call
         const paramString = params.length > 0 ? params.join(', ') : '';
-        return `${indent}${definition.swiftView}(${paramString})`;
+        lines.push(`${indent}${definition.swiftView}(${paramString})`);
+
+        // In handoff mode, add TODO for action/callback if this looks like an interactive component
+        if (this.handoffMode && this.looksInteractive(definition, node)) {
+            lines.push(`${indent}    // TODO: Add action handler`);
+        }
+
+        return lines.join('\n');
     }
 
     private findDefinition(node: FigmaNode): ComponentDefinition | undefined {
@@ -75,6 +98,16 @@ export class ConfigurableComponentTranslator implements ComponentTranslator {
             }
         }
 
-        return "/* missing */"
+        return "/* missing */";
+    }
+
+    /**
+     * Heuristic: determine if a component likely needs an action handler.
+     * Checks for common interactive component patterns in the name.
+     */
+    private looksInteractive(definition: ComponentDefinition, node: FigmaNode): boolean {
+        const name = (definition.swiftView + ' ' + node.name).toLowerCase();
+        const interactivePatterns = ['button', 'tap', 'click', 'link', 'toggle', 'switch', 'checkbox', 'radio'];
+        return interactivePatterns.some(pattern => name.includes(pattern));
     }
 }

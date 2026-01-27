@@ -60,6 +60,8 @@ export const ComponentDefinitionSchema = z.object({
 
 
 export const ComponentConfigurationSchema = z.object({
+    handoffMode: z.boolean().default(true)
+        .describe("When true (default), generate scaffolds with TODOs instead of full implementations"),
     components: z.array(ComponentDefinitionSchema).default([]),
 });
 

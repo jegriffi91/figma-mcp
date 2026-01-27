@@ -14,6 +14,7 @@ import { DesignTokenResolver } from './tokens/resolver';
 import { FrameTranslator, TextTranslator } from './translator/swiftui/primitives';
 import { DesignSystemLoader } from './core/loader';
 import { ConfigurableComponentTranslator } from './translator/swiftui/configurable_component';
+import { PlaceholderTranslator } from './translator/swiftui/placeholder_translator';
 
 /**
  * Figma MCP Server
@@ -63,7 +64,10 @@ class FigmaMcpServer {
             this.registry.register(new ConfigurableComponentTranslator(components));
         }
 
-        // 2. Generic Primitives
+        // 2. Placeholder for unknown components (handoff mode)
+        this.registry.register(new PlaceholderTranslator());
+
+        // 3. Generic Primitives
         this.registry.register(new TextTranslator());
         this.registry.register(new FrameTranslator());
 
@@ -93,6 +97,10 @@ class FigmaMcpServer {
                                 node_id: {
                                     type: 'string',
                                     description: 'The ID of the node to translate (e.g., "1:2")',
+                                },
+                                handoff_mode: {
+                                    type: 'boolean',
+                                    description: 'Generate scaffold with TODOs instead of full implementations (default: true)',
                                 },
                             },
                             required: ['file_key', 'node_id'],
