@@ -2,6 +2,7 @@
     "components": [
         {
             "figmaId": "test:button",
+            "figmaFileKey": "ABC123XYZ",
             "swiftView": "DSButton",
             "sourceFile": "Sources/DesignSystem/Button/DSButton.swift",
             "params": {

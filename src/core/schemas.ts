@@ -49,6 +49,7 @@ export const TokenConfigurationSchema = z.object({
 
 export const ComponentDefinitionSchema = z.object({
     figmaId: z.string().describe("Figma Component ID or name pattern"),
+    figmaFileKey: z.string().optional().describe("Figma file key where this component lives (for reference/automation)"),
     swiftView: z.string().describe("The SwiftUI View struct name, e.g. 'DSButton'"),
     sourceFile: z.string().optional().describe("Path to the Swift source file for reference"),
     params: z.record(
@@ -56,6 +57,7 @@ export const ComponentDefinitionSchema = z.object({
         z.string()  // Swift param name (e.g. 'title')
     ).optional().describe("Maps Figma property names to Swift parameter names"),
 });
+
 
 export const ComponentConfigurationSchema = z.object({
     components: z.array(ComponentDefinitionSchema).default([]),

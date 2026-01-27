@@ -84,6 +84,7 @@ This file maps Figma components to SwiftUI Views.
   "components": [
     {
       "figmaId": "12345:67890",
+      "figmaFileKey": "ABC123XYZ",
       "swiftView": "DSButton",
       "sourceFile": "Sources/DesignSystem/Button/DSButton.swift",
       "params": {
@@ -92,7 +93,8 @@ This file maps Figma components to SwiftUI Views.
       }
     },
     {
-      "figmaId": "12345:67891", 
+      "figmaId": "12345:67891",
+      "figmaFileKey": "ABC123XYZ",
       "swiftView": "DSCard",
       "sourceFile": "Sources/DesignSystem/Card/DSCard.swift",
       "params": {
@@ -108,6 +110,7 @@ This file maps Figma components to SwiftUI Views.
 | Field | Description | Example |
 |-------|-------------|---------|
 | `figmaId` | The Figma Component ID or Instance name | `"12345:67890"` or `"DSButton"` |
+| `figmaFileKey` | Figma file key (optional, for reference/automation) | `"ABC123XYZ"` |
 | `swiftView` | Your SwiftUI View struct name | `"DSButton"` |
 | `sourceFile` | Path to Swift source file (for reference) | `"Sources/.../DSButton.swift"` |
 | `params` | Maps Figma property → Swift parameter | `{ "Label": "title" }` |
