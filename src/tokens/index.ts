@@ -1,3 +1,3 @@
 export { DesignTokenResolver } from './resolver';
-export { stubTokenDefinitions } from './stub_definitions';
-export * from './types';
+// Re-export types from consolidated schemas
+export * from '../core/schemas';

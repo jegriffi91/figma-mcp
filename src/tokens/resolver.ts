@@ -12,8 +12,7 @@ import {
     TypographyToken,
     CornerRadiusToken,
     TokenResolutionResult,
-} from './types';
-import { stubTokenDefinitions } from './stub_definitions';
+} from '../core/schemas';
 import { FigmaTextStyle, FigmaColor, FigmaSolidFillWithBinding } from '../figma/types';
 
 export class DesignTokenResolver {
@@ -25,9 +24,10 @@ export class DesignTokenResolver {
     private static COLOR_TOLERANCE = 0.05;   // 0-1 range
     private static FONT_SIZE_TOLERANCE = 1;  // points
 
-    constructor(definitions?: DesignTokenDefinitions) {
-        this.definitions = definitions || stubTokenDefinitions;
+    constructor(definitions: DesignTokenDefinitions) {
+        this.definitions = definitions;
     }
+
 
     /**
      * Set variable ID → token name mapping

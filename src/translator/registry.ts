@@ -7,9 +7,10 @@ export class TranslatorRegistry {
     private fallbackTranslator?: ComponentTranslator;
     private tokenResolver: DesignTokenResolver;
 
-    constructor(tokenResolver?: DesignTokenResolver) {
-        this.tokenResolver = tokenResolver ?? new DesignTokenResolver();
+    constructor(tokenResolver: DesignTokenResolver) {
+        this.tokenResolver = tokenResolver;
     }
+
 
     register(translator: ComponentTranslator) {
         this.translators.push(translator);

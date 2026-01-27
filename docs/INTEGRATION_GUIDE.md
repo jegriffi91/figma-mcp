@@ -1,330 +1,280 @@
-# GitHub Copilot Integration Guide
+# Integration Guide
 
-This guide explains how to connect this Figma MCP server to various GitHub Copilot clients, including **VS Code**, **Copilot CLI**, and **GitHub for Xcode**.
+This guide explains how to integrate your Design System with the Figma MCP server.
 
-## 1. Prerequisites
+## Prerequisites
 
-1.  **Build the Project**: Ensure the project is compiled to JavaScript.
-    ```bash
-    npm run build
-    ```
-2.  **Verify Path**: Standardize on absolute paths for configuration.
-    ```bash
-    # Run this to get the path to use in configs
-    echo "$(pwd)/dist/index.js"
-    ```
+1. **Build the Project**:
+   ```bash
+   npm run build
+   ```
 
-## 2. Configuration for VS Code & Copilot CLI
+2. **Set Environment Variables** (in `.env` or your MCP config):
+   ```bash
+   FIGMA_ACCESS_TOKEN=your_figma_token
+   DESIGN_SYSTEM_ROOT=/path/to/your/config
+   ```
 
-Both the **VS Code Chat extension** and the **GitHub Copilot CLI** share the same configuration file location.
+---
 
-1.  **File Location**: `~/.copilot/mcp-config.json` (Create it if it doesn't exist).
-2.  **Add Entry**: Insert the configuration for `figma-mcp`:
+## Step 1: Create Your Configuration Directory
+
+Create a directory where your design system configuration will live:
+
+```bash
+mkdir -p ~/my-design-system-config
+```
+
+This path will be your `DESIGN_SYSTEM_ROOT`.
+
+---
+
+## Step 2: Create `tokens.json`
+
+This file defines your design tokens (colors, spacing, typography, corner radius).
+
+**File:** `~/my-design-system-config/tokens.json`
+
+```json
+{
+  "colors": [
+    { "name": "Color.primary", "r": 0.0, "g": 0.478, "b": 1.0 },
+    { "name": "Color.secondary", "r": 0.345, "g": 0.337, "b": 0.839 },
+    { "name": "Color.background", "r": 1.0, "g": 1.0, "b": 1.0 },
+    { "name": "Color.textPrimary", "r": 0.0, "g": 0.0, "b": 0.0 }
+  ],
+  "spacing": [
+    { "name": "Spacing.none", "value": 0 },
+    { "name": "Spacing.xs", "value": 4 },
+    { "name": "Spacing.small", "value": 8 },
+    { "name": "Spacing.medium", "value": 16 },
+    { "name": "Spacing.large", "value": 24 }
+  ],
+  "typography": [
+    { "name": "Font.title", "fontFamily": "SF Pro Display", "fontWeight": 700, "fontSize": 28 },
+    { "name": "Font.body", "fontFamily": "SF Pro Text", "fontWeight": 400, "fontSize": 17 }
+  ],
+  "cornerRadius": [
+    { "name": "Radius.small", "value": 4 },
+    { "name": "Radius.medium", "value": 8 },
+    { "name": "Radius.large", "value": 16 }
+  ]
+}
+```
+
+### How to Get Token Values
+
+| Field | Where to Find It |
+|-------|------------------|
+| `name` | The exact Swift property name you use in code (e.g., `Color.primary`) |
+| `r`, `g`, `b` | RGB values from 0.0 to 1.0. Divide hex by 255 (e.g., `#007AFF` → `r: 0, g: 0.478, b: 1`) |
+| `value` (spacing/radius) | Pixel/point value from Figma or your Swift constants |
+| `fontWeight` | 400 = Regular, 500 = Medium, 600 = Semibold, 700 = Bold |
+
+---
+
+## Step 3: Create `components.json`
+
+This file maps Figma components to SwiftUI Views.
+
+**File:** `~/my-design-system-config/components.json`
+
+```json
+{
+  "components": [
+    {
+      "figmaId": "12345:67890",
+      "swiftView": "DSButton",
+      "sourceFile": "Sources/DesignSystem/Button/DSButton.swift",
+      "params": {
+        "Label": "title",
+        "Variant": "style"
+      }
+    },
+    {
+      "figmaId": "12345:67891", 
+      "swiftView": "DSCard",
+      "sourceFile": "Sources/DesignSystem/Card/DSCard.swift",
+      "params": {
+        "Elevation": "elevation"
+      }
+    }
+  ]
+}
+```
+
+### Field Reference
+
+| Field | Description | Example |
+|-------|-------------|---------|
+| `figmaId` | The Figma Component ID or Instance name | `"12345:67890"` or `"DSButton"` |
+| `swiftView` | Your SwiftUI View struct name | `"DSButton"` |
+| `sourceFile` | Path to Swift source file (for reference) | `"Sources/.../DSButton.swift"` |
+| `params` | Maps Figma property → Swift parameter | `{ "Label": "title" }` |
+
+### How to Find Your Figma Component ID
+
+1. **In Figma**: Right-click on a component instance → **Copy link**
+2. **In the URL**: Find the `node-id` parameter
+   ```
+   https://figma.com/file/ABC123?node-id=12345:67890
+                                           ↑↑↑↑↑↑↑↑↑↑↑
+   ```
+3. Use `12345:67890` as your `figmaId`
+
+**Alternative**: Use the component name (less reliable but works for development):
+```json
+{ "figmaId": "DSButton", "swiftView": "DSButton", ... }
+```
+
+### How to Map Parameters
+
+1. **In Figma**: Select the component instance and look at the right panel
+2. **Find Component Properties**: These are labeled like `Label`, `Variant`, `Disabled`, etc.
+3. **Map to Swift params**: Match them to your SwiftUI initializer parameters
+
+**Example Figma Properties → Swift Mapping:**
+
+| Figma Property | Swift Parameter | JSON |
+|----------------|-----------------|------|
+| `Label` (TEXT) | `title: String` | `"Label": "title"` |
+| `Variant` (VARIANT) | `style: DSButtonStyle` | `"Variant": "style"` |
+| `Disabled` (BOOLEAN) | `isDisabled: Bool` | `"Disabled": "isDisabled"` |
+
+---
+
+## Step 4: Configure the MCP Server
+
+Update your MCP configuration to point to your config directory.
+
+**File:** `~/.copilot/mcp-config.json`
 
 ```json
 {
   "mcpServers": {
     "figma-mcp": {
       "command": "node",
-      "args": ["/Users/YOUR_USER/path/to/figma-mcp/dist/index.js"],
+      "args": ["/path/to/figma-mcp/dist/index.js"],
       "env": {
-        "FIGMA_ACCESS_TOKEN": "your_figma_token_here",
-        "USE_MOCK_FIGMA": "false",
-        "DESIGN_SYSTEM_ROOT": "../../Modules/DesignSystem"
+        "FIGMA_ACCESS_TOKEN": "your_token_here",
+        "DESIGN_SYSTEM_ROOT": "/Users/you/my-design-system-config"
       }
     }
   }
 }
 ```
 
-> [!NOTE]
-> For the **CLI**, you can also add this interactively using the `/mcp add` command if your version supports it, though manual editing is more reliable for passing multiple environment variables like `DESIGN_SYSTEM_ROOT`.
+---
 
-## 3. Configuration for GitHub for Xcode
+## Step 5: Verify Configuration
 
-If you are using the **GitHub for Xcode** extension (or the Copilot for Xcode application):
+1. **Restart your IDE** (or reload the Copilot extension)
+2. **Test with a Figma node**:
+   > "Translate Figma node '12345:67890' from file 'ABC123XYZ' into SwiftUI."
 
-1.  **Open Settings**: Navigate to the extension settings/companion app.
-2.  **MCP Settings**: Look for the **MCP Servers** or **External Tools** section.
-3.  **Local Server Setup**:
-    -   Some versions allow adding a "Local" or "Stdio" server by providing the `node` command and arguments.
-    -   If the UI only supports **HTTP** servers: You may need to run this server through an MCP-over-HTTP proxy (like `mcp-proxy`) since this server is built for Stdio by default.
-4.  **Environment Variables**: Ensure you provide `FIGMA_ACCESS_TOKEN` and `USE_MOCK_FIGMA` in the client's "Environment Variables" section.
-
-## 4. Usage in Copilot Chat / CLI
-
-
-> [!TIP]
-> To find your absolute path, run `pwd` in the project root and append `/dist/index.js`.
-
-## 3. Usage in Copilot
-
-Once configured:
-1.  **Restart VS Code** (or reload the window).
-2.  In Copilot Chat, you can now ask questions type `@mcp` (or simply ask about Figma nodes if your client supports auto-tool usage).
-3.  **Example Command**:
-    > "Translate Figma node '1:2' from file 'ABC123XYZ' into SwiftUI."
-
-## 4. Troubleshooting
-
--   **Logs**: The server logs errors to `stderr`, which Copilot captures. Check the Copilot extension logs in your IDE (Output > GitHub Copilot) for any "[MCP Error]" messages.
--   **Mock Mode**: If you are hitting Figma API limits, set `"USE_MOCK_FIGMA": "true"` in the `mcp-config.json` entry to use the local sample data.
--   **Path Issues**: Ensure the `command` is mapped to a valid `node` executable and the `args` path is correct.
+3. **Check logs** for confirmation:
+   ```
+   [Init] Loading Design System from: /Users/you/my-design-system-config
+   [Init] Registering 2 configurable components
+   ```
 
 ---
 
-## 5. Translator Registry Architecture
+## Example: Full Walkthrough
 
-The server uses a **Registry + Strategy pattern** to translate Figma nodes to SwiftUI. Understanding this flow is essential for adding your own Design System components.
+Let's say your Design System has:
+- A `DSButton` component in Figma with ID `55:1234`
+- A `DSCard` component in Figma with ID `55:1235`
 
-### How Translation Works
+### 1. Create the config files
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         TranslatorRegistry                          │
-├─────────────────────────────────────────────────────────────────────┤
-│  Translators (checked in order):                                    │
-│  ┌─────────────────────────────────────────────────────────────────┐│
-│  │ 1. StubButtonTranslator  →  canHandle(node)?  →  ✓ translate() ││
-│  │ 2. TextTranslator        →  canHandle(node)?  →  ✓ translate() ││
-│  │ 3. FrameTranslator       →  canHandle(node)?  →  ✓ translate() ││
-│  │ 4. (fallback)            →  always matches                      ││
-│  └─────────────────────────────────────────────────────────────────┘│
-└─────────────────────────────────────────────────────────────────────┘
-```
-
-**Flow for each node:**
-
-1. The registry iterates through registered translators **in order**
-2. Each translator's `canHandle(node)` is called
-3. The **first translator that returns `true`** handles the node
-4. That translator's `translate(node, context)` generates SwiftUI code
-5. If no translator matches, the **fallback** is used
-
-### Registration Order Matters
-
-Translators are checked in registration order. **Specific component translators must be registered before generic ones:**
-
-```typescript
-// In src/index.ts → initializeRegistry()
-
-// ✅ CORRECT ORDER
-registry.register(new StubButtonTranslator());   // Specific DS component
-registry.register(new TextTranslator());         // TEXT nodes
-registry.register(new FrameTranslator());        // FRAME/GROUP/etc.
-registry.setFallback(new FrameTranslator());     // Catch-all
-
-// ❌ WRONG ORDER - FrameTranslator would match INSTANCE nodes first!
-registry.register(new FrameTranslator());
-registry.register(new StubButtonTranslator());   // Never reached for INSTANCE
+**tokens.json:**
+```json
+{
+  "colors": [
+    { "name": "AppColor.brand", "r": 0.2, "g": 0.4, "b": 0.8 }
+  ],
+  "spacing": [
+    { "name": "AppSpacing.standard", "value": 16 }
+  ],
+  "typography": [],
+  "cornerRadius": []
+}
 ```
 
-### Do You Need a Translator for Every Component?
-
-**No.** The system is designed with graceful fallback:
-
-| Node Type | Has Specific Translator? | Result |
-|-----------|--------------------------|--------|
-| DS Button (INSTANCE) | ✅ Yes | `DSButton(title: "...", style: .primary)` |
-| DS Card (INSTANCE) | ❌ No | Falls back to `FrameTranslator` → `VStack { ... }` |
-| Unknown FRAME | ❌ No | Falls back to `FrameTranslator` → `VStack { ... }` |
-| TEXT | ✅ Yes | `Text("...").font(...)` |
-
-**The fallback produces valid SwiftUI**, just not DS-specific code. You only need to add translators for components where you want **specific DS API calls** (e.g., `DSButton`, `DSCard`, `DSAvatar`).
-
-### Adding a Custom DS Component Translator
-
-**Example: Adding a Card translator for your company's `DSCard` component.**
-
-1. **Create the translator file:**
-
-```typescript
-// src/translator/swiftui/ds_card.ts
-import { ComponentTranslator, TranslationContext } from '../core/types';
-import { FigmaNode } from '../../figma/types';
-
-export class DSCardTranslator implements ComponentTranslator {
-    // Known component IDs from your Figma library
-    private readonly CARD_COMPONENT_IDS = [
-        '12345:67890',  // Card / Default variant
-        '12345:67891',  // Card / Elevated variant
-    ];
-
-    canHandle(node: FigmaNode): boolean {
-        // Match by componentId (most reliable)
-        if (node.type === 'INSTANCE' && node.componentId) {
-            return this.CARD_COMPONENT_IDS.includes(node.componentId);
-        }
-        return false;
+**components.json:**
+```json
+{
+  "components": [
+    {
+      "figmaId": "55:1234",
+      "swiftView": "DSButton",
+      "sourceFile": "DesignSystem/DSButton.swift",
+      "params": {
+        "Label": "title",
+        "Style": "style"
+      }
+    },
+    {
+      "figmaId": "55:1235",
+      "swiftView": "DSCard",
+      "sourceFile": "DesignSystem/DSCard.swift",
+      "params": {}
     }
-
-    translate(node: FigmaNode, context: TranslationContext): string {
-        const indent = '    '.repeat(context.indentionLevel);
-        
-        // Determine variant from componentProperties
-        const elevation = node.componentProperties?.['Elevation'];
-        const style = elevation?.value === 'Elevated' ? '.elevated' : '.default';
-        
-        // Recursively translate children
-        let childCode = '';
-        if (node.children) {
-            const childContext = { ...context, indentionLevel: context.indentionLevel + 1 };
-            childCode = node.children
-                .map(child => context.registry.translate(child, childContext))
-                .join('\n');
-        }
-        
-        return `${indent}DSCard(style: ${style}) {\n${childCode}\n${indent}}`;
-    }
+  ]
 }
 ```
 
-2. **Register it in `src/index.ts`:**
+### 2. Set environment variable
 
-```typescript
-import { DSCardTranslator } from './translator/swiftui/ds_card';
-
-private initializeRegistry(): TranslatorRegistry {
-    const registry = new TranslatorRegistry();
-
-    // Register specific DS components first
-    registry.register(new StubButtonTranslator());
-    registry.register(new DSCardTranslator());      // ← ADD HERE
-
-    // Generic translators
-    registry.register(new TextTranslator());
-    registry.register(new FrameTranslator());
-    registry.setFallback(new FrameTranslator());
-
-    return registry;
-}
+```bash
+export DESIGN_SYSTEM_ROOT=/Users/me/my-design-system-config
 ```
 
-3. **Find your `componentId`:**
-   - In Figma, right-click the component instance → "Copy link"
-   - The URL contains the node ID: `...?node-id=12345:67890`
-   - Or use the Figma API to list components in your library
+### 3. Run the MCP server
 
-### The Translation Context
-
-Each translator receives a `TranslationContext` with:
-
-| Property | Purpose |
-|----------|---------|
-| `registry` | Call `registry.translate(child, context)` for recursive translation |
-| `tokenResolver` | Resolve Figma values to DS tokens (colors, spacing, etc.) |
-| `depth` | Current nesting depth (for debugging) |
-| `indentionLevel` | Current indentation (for code formatting) |
-
-### Recursive Translation Example
-
-When translating a Card with nested content:
-
-```typescript
-translate(node: FigmaNode, context: TranslationContext): string {
-    // Recursively translate children using the registry
-    const childContext = { 
-        ...context, 
-        depth: context.depth + 1,
-        indentionLevel: context.indentionLevel + 1 
-    };
-    
-    const childrenCode = node.children?.map(child => 
-        context.registry.translate(child, childContext)  // ← RECURSIVE
-    ).join('\n') ?? '';
-    
-    return `DSCard {\n${childrenCode}\n}`;
-}
+```bash
+npm run build && node dist/index.js
 ```
 
-This allows a `DSCard` containing a `DSButton` to correctly output:
+### 4. Expected output for node `55:1234`
+
+If the Figma node has properties `Label: "Submit"` and `Style: "Primary"`:
 
 ```swift
-DSCard {
-    DSButton(title: "Submit", style: .primary)
-}
+DSButton(title: "Submit", style: .primary)
 ```
 
 ---
 
-## 6. Token Definitions
+## Troubleshooting
 
-The server maps Figma values (colors, spacing, typography) to your Design System tokens using `src/tokens/stub_definitions.ts`.
-
-### Customizing for Your Company
-
-Replace the stub values with your actual DS tokens:
-
-```typescript
-// src/tokens/stub_definitions.ts
-export const stubTokenDefinitions: DesignTokenDefinitions = {
-    spacing: [
-        { name: 'YourDS.Spacing.none', value: 0 },
-        { name: 'YourDS.Spacing.xs', value: 4 },
-        { name: 'YourDS.Spacing.sm', value: 8 },
-        // ... your actual values
-    ],
-    colors: [
-        { name: 'YourDS.Color.primary', r: 0.2, g: 0.4, b: 0.9 },
-        // ... your actual RGB values (0-1 range)
-    ],
-    // ...
-};
-```
-
-The resolver uses **tolerance matching** to find the closest token, so exact matches aren't required.
+| Issue | Solution |
+|-------|----------|
+| "No translator found" | Component not in `components.json`. Add it or rely on generic fallback. |
+| Wrong parameter values | Check that Figma property names match the `params` keys exactly (case-sensitive). |
+| Empty output | Verify `DESIGN_SYSTEM_ROOT` path is correct and files are valid JSON. |
+| Build errors | Run `npm run build` and check for TypeScript errors. |
 
 ---
 
-## 7. FAQ & Common Patterns
+## Architecture Overview
 
-### How can I find the diff between my SwiftUI design and what's on Figma?
-
-Since the MCP tool generates text, the "diff" is structural rather than visual.
-
-1.  **Ask the LLM**: "Does the generated code match the design properties?"
-    -   This triggers the LLM to re-analyze the Figma node JSON (fills, padding, alignment) and compare it against the generated SwiftUI.
-2.  **Visual Diff**: Use Xcode Previews side-by-side with your Figma window.
-3.  **Property Inspection**: Use the `figma_to_swiftui` tool on a specific node ID to see exactly what the server sees.
-    -   Example: "Debug the padding on node 1:2" will show you the raw JSON if the model chooses to inspect it.
-
-### My component encounters custom implementations (e.g., GeometryReader)
-
-If a component requires complex layout logic that standard stacks (HStack/VStack) cannot handle, you have two options:
-
-**Option A: Custom Translator (Robust)**
-Write a specific translator for that component ID or name pattern.
-
-```typescript
-export class ChartTranslator implements ComponentTranslator {
-    canHandle(node: FigmaNode): boolean {
-        // Match a specific group or frame name
-        return node.name === "ComplexChartContainer";
-    }
-
-    translate(node: FigmaNode, context: TranslationContext): string {
-        // Emit custom SwiftUI that uses GeometryReader
-        return `
-        GeometryReader { proxy in
-            CustomChartView(width: proxy.size.width)
-        }`;
-    }
-}
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      DESIGN_SYSTEM_ROOT                         │
+├─────────────────────────────────────────────────────────────────┤
+│  tokens.json          →  DesignTokenResolver                    │
+│  components.json      →  ConfigurableComponentTranslator        │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│                     TranslatorRegistry                          │
+├─────────────────────────────────────────────────────────────────┤
+│  1. ConfigurableComponentTranslator (from JSON)                 │
+│  2. TextTranslator (generic TEXT nodes)                         │
+│  3. FrameTranslator (generic layout fallback)                   │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-**Option B: "Escape Hatch" in FrameTranslator**
-Modify `FrameTranslator` to detect specific markers (e.g., a frame named `__USE_GEOMETRY_READER__`) and change output accordingly.
-
-### Working around Variance (Custom Modifiers)
-
-If your codebase relies on custom view modifiers (e.g., `.dsStyle(.card)` instead of discrete padding/background modifiers):
-
-1.  **Update `FrameTranslator`**: modify `buildModifiers` to output your custom modifier.
-2.  **Create a Wrapper**: Instead of generating `VStack`, generate `DSCardView { VStack ... }` via a custom `DSCardTranslator`.
-
-### How do I handle new Figma features (e.g. Min/Max Width)?
-
-The MCP server needs type definitions updated to support new Figma API fields.
-1.  Add the property to `src/figma/types.ts`.
-2.  Update `FrameTranslator` or `primitives.ts` to read that property and emit usage code.
-
+All component mappings come from `components.json`. No code changes needed.

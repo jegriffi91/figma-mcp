@@ -12,7 +12,6 @@ import { getFigmaClient } from './figma/client';
 import { TranslatorRegistry } from './translator/registry';
 import { DesignTokenResolver } from './tokens/resolver';
 import { FrameTranslator, TextTranslator } from './translator/swiftui/primitives';
-import { StubButtonTranslator } from './translator/swiftui/stub_components';
 import { DesignSystemLoader } from './core/loader';
 import { ConfigurableComponentTranslator } from './translator/swiftui/configurable_component';
 
@@ -23,7 +22,7 @@ import { ConfigurableComponentTranslator } from './translator/swiftui/configurab
 class FigmaMcpServer {
     private server: Server;
     private figmaClient = getFigmaClient();
-    private registry: TranslatorRegistry;
+    private registry!: TranslatorRegistry; // Initialized in initialize()
 
     constructor() {
         this.server = new Server(
@@ -38,7 +37,6 @@ class FigmaMcpServer {
             }
         );
 
-        this.registry = this.initializeRegistry();
         this.setupHandlers();
         this.setupErrorHandling();
     }
@@ -65,32 +63,12 @@ class FigmaMcpServer {
             this.registry.register(new ConfigurableComponentTranslator(components));
         }
 
-        // 2. Specific Code-based Stubs (Fallbacks or Special Logic)
-        this.registry.register(new StubButtonTranslator());
-
-        // 3. Generic Primitives
+        // 2. Generic Primitives
         this.registry.register(new TextTranslator());
-        this.registry.register(new FrameTranslator()); // Serves as a fallback for most layout nodes
+        this.registry.register(new FrameTranslator());
 
         // 4. Fallback
         this.registry.setFallback(new FrameTranslator());
-    }
-
-    private initializeRegistry(): TranslatorRegistry {
-        // Initial sync registry (will be overwritten by initialize)
-        const registry = new TranslatorRegistry();
-
-        // Register specific components first (Strategy Pattern)
-        registry.register(new StubButtonTranslator());
-
-        // Register generic primitives
-        registry.register(new TextTranslator());
-        registry.register(new FrameTranslator()); // Serves as a fallback for most layout nodes
-
-        // Explicit fallback for unknown types
-        registry.setFallback(new FrameTranslator());
-
-        return registry;
     }
 
     private setupHandlers() {

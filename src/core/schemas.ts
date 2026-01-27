@@ -11,7 +11,7 @@ export const ColorTokenSchema = z.object({
     r: z.number().min(0).max(1),
     g: z.number().min(0).max(1),
     b: z.number().min(0).max(1),
-    a: z.number().min(0).max(1).optional().default(1),
+    a: z.number().min(0).max(1).optional(),
 });
 
 export const SpacingTokenSchema = z.object({
@@ -66,6 +66,26 @@ export const ComponentConfigurationSchema = z.object({
 export type ColorToken = z.infer<typeof ColorTokenSchema>;
 export type SpacingToken = z.infer<typeof SpacingTokenSchema>;
 export type TypographyToken = z.infer<typeof TypographyTokenSchema>;
+export type CornerRadiusToken = z.infer<typeof CornerRadiusTokenSchema>;
 export type TokenConfiguration = z.infer<typeof TokenConfigurationSchema>;
 export type ComponentDefinition = z.infer<typeof ComponentDefinitionSchema>;
 export type ComponentConfiguration = z.infer<typeof ComponentConfigurationSchema>;
+
+// Alias for backward compatibility
+export type DesignTokenDefinitions = TokenConfiguration;
+
+// Result types for token resolution
+export type TokenResolutionSuccess<T> = {
+    success: true;
+    token: T;
+    swiftUIValue: string;
+};
+
+export type TokenResolutionFailure = {
+    success: false;
+    rawValue: string;
+    message: string;
+    closestMatches?: Array<{ name: string; value: string }>;
+};
+
+export type TokenResolutionResult<T> = TokenResolutionSuccess<T> | TokenResolutionFailure;
