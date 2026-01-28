@@ -15,6 +15,7 @@ import { FrameTranslator, TextTranslator } from './translator/swiftui/primitives
 import { DesignSystemLoader } from './core/loader';
 import { ConfigurableComponentTranslator } from './translator/swiftui/configurable_component';
 import { PlaceholderTranslator } from './translator/swiftui/placeholder_translator';
+import { VisionContextExtractor } from './translator/vision_context';
 
 /**
  * Figma MCP Server
@@ -24,6 +25,7 @@ class FigmaMcpServer {
     private server: Server;
     private figmaClient = getFigmaClient();
     private registry!: TranslatorRegistry; // Initialized in initialize()
+    private visionExtractor?: VisionContextExtractor; // Initialized in initialize()
 
     constructor() {
         this.server = new Server(
@@ -55,6 +57,7 @@ class FigmaMcpServer {
         // A better approach in refactor would be to make registry async or having a 'configure' method
         const tokenResolver = new DesignTokenResolver(tokens);
         this.registry = new TranslatorRegistry(tokenResolver);
+        this.visionExtractor = new VisionContextExtractor(tokenResolver);
 
         // Register Translators
 
@@ -106,6 +109,28 @@ class FigmaMcpServer {
                             required: ['file_key', 'node_id'],
                         },
                     },
+                    {
+                        name: 'figma_vision_translate',
+                        description: 'Exports a Figma node as PNG image with extracted metadata for vision-based SwiftUI generation. Returns base64 image + colors/typography/spacing data.',
+                        inputSchema: {
+                            type: 'object',
+                            properties: {
+                                file_key: {
+                                    type: 'string',
+                                    description: 'The key of the Figma file',
+                                },
+                                node_id: {
+                                    type: 'string',
+                                    description: 'The ID of the node to export (e.g., "1:2")',
+                                },
+                                scale: {
+                                    type: 'number',
+                                    description: 'Export scale factor (1-4), default 2',
+                                },
+                            },
+                            required: ['file_key', 'node_id'],
+                        },
+                    },
                 ],
             };
         });
@@ -113,8 +138,15 @@ class FigmaMcpServer {
 
     private setupCallToolHandler() {
         this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
-            if (request.params.name !== 'figma_to_swiftui') {
-                throw new McpError(ErrorCode.MethodNotFound, `Tool not found: ${request.params.name}`);
+            const toolName = request.params.name;
+
+            // Route to appropriate handler
+            if (toolName === 'figma_vision_translate') {
+                return this.handleVisionTranslate(request.params.arguments as any);
+            }
+
+            if (toolName !== 'figma_to_swiftui') {
+                throw new McpError(ErrorCode.MethodNotFound, `Tool not found: ${toolName}`);
             }
 
             const args = request.params.arguments as { file_key: string; node_id: string };
@@ -152,6 +184,66 @@ class FigmaMcpServer {
                 };
             }
         });
+    }
+
+    private async handleVisionTranslate(args: { file_key: string; node_id: string; scale?: number }) {
+        if (!args.file_key || !args.node_id) {
+            throw new McpError(ErrorCode.InvalidParams, 'Missing required arguments: file_key, node_id');
+        }
+
+        try {
+            console.error(`[Tool] figma_vision_translate called for node ${args.node_id} in file ${args.file_key}`);
+            const scale = args.scale ?? 2;
+
+            // Check if client supports image export
+            if (!this.figmaClient.getNodeImage) {
+                throw new Error('Image export not supported in mock mode. Use real Figma client.');
+            }
+
+            // 1. Export node as image
+            const imageResult = await this.figmaClient.getNodeImage(args.file_key, args.node_id, scale);
+
+            // 2. Fetch node metadata
+            const node = await this.figmaClient.getNode(args.file_key, args.node_id);
+
+            // 3. Extract flattened metadata
+            const metadata = this.visionExtractor!.extract(node);
+
+            // 4. Generate analysis prompt
+            const prompt = this.visionExtractor!.generateAnalysisPrompt(node.name, metadata);
+
+            // 5. Return structured payload
+            const payload = {
+                image: {
+                    base64: imageResult.base64Data,
+                    width: imageResult.width,
+                    height: imageResult.height,
+                    mimeType: 'image/png',
+                },
+                metadata,
+                prompt,
+            };
+
+            return {
+                content: [
+                    {
+                        type: 'text',
+                        text: JSON.stringify(payload, null, 2),
+                    },
+                ],
+            };
+        } catch (error: any) {
+            console.error(`[Error] Vision translate failed:`, error);
+            return {
+                content: [
+                    {
+                        type: 'text',
+                        text: `Error: ${error.message}`,
+                    },
+                ],
+                isError: true,
+            };
+        }
     }
 
     private setupErrorHandling() {

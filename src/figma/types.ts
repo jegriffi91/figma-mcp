@@ -159,8 +159,16 @@ export interface FigmaNode {
     componentProperties?: Record<string, FigmaComponentProperty>;
 }
 
+export interface ImageExportResult {
+    imageUrl: string;
+    base64Data: string;
+    width: number;
+    height: number;
+}
+
 export interface FigmaDataSource {
     getNode(fileKey: string, nodeId: string): Promise<FigmaNode>;
+    getNodeImage?(fileKey: string, nodeId: string, scale?: number): Promise<ImageExportResult>;
 }
 
 export interface FigmaApiResponse {
