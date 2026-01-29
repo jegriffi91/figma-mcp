@@ -7,6 +7,8 @@ export interface TranslationContext {
     tokenResolver: DesignTokenResolver;
     depth: number;
     indentionLevel: number;
+    components?: Record<string, import('../../figma/types').FigmaComponentMetadata>;
+    componentSets?: Record<string, import('../../figma/types').FigmaComponentSetMetadata>;
 }
 
 export interface ComponentTranslator {
@@ -14,8 +16,11 @@ export interface ComponentTranslator {
      * Returns true if this translator can handle the given node.
      * Priority is determined by the order of registration, 
      * so specific component translators should be checked before generic ones.
+     * 
+     * @param node The Figma node to check
+     * @param context Optional context containing componentSets and components for advanced matching
      */
-    canHandle(node: FigmaNode): boolean;
+    canHandle(node: FigmaNode, context?: Partial<TranslationContext>): boolean;
 
     /**
      * Translates the node into SwiftUI code.

@@ -21,22 +21,17 @@ export class ConfigurableComponentTranslator implements ComponentTranslator {
         return this.config.handoffMode ?? true;
     }
 
-    canHandle(node: FigmaNode): boolean {
+    canHandle(node: FigmaNode, context?: Partial<TranslationContext>): boolean {
         if (node.type !== 'INSTANCE' && node.type !== 'COMPONENT') {
             return false;
         }
 
-        const componentId = node.componentId;
-        const componentName = node.componentName || node.name;
-
-        return this.config.components.some(def =>
-            def.figmaId === componentId || def.figmaId === componentName
-        );
+        return !!this.findDefinition(node, context?.componentSets, context?.components);
     }
 
     translate(node: FigmaNode, context: TranslationContext): string {
         const indent = '    '.repeat(context.indentionLevel);
-        const definition = this.findDefinition(node);
+        const definition = this.findDefinition(node, context.componentSets, context.components);
 
         if (!definition) {
             return `${indent}// Error: No definition found for component`;
@@ -74,10 +69,32 @@ export class ConfigurableComponentTranslator implements ComponentTranslator {
         return lines.join('\n');
     }
 
-    private findDefinition(node: FigmaNode): ComponentDefinition | undefined {
+    private findDefinition(node: FigmaNode, componentSets?: Record<string, import('../../figma/types').FigmaComponentSetMetadata>, components?: Record<string, import('../../figma/types').FigmaComponentMetadata>): ComponentDefinition | undefined {
         const componentId = node.componentId;
         const componentName = node.componentName || node.name;
 
+        // Priority 1: Check componentSets via componentId directly (if instance points to set or variant matches set key)
+        if (componentId && componentSets && componentSets[componentId]) {
+            const setMetadata = componentSets[componentId];
+            const match = this.config.components.find(def =>
+                def.figmaId === setMetadata.name || def.figmaId === componentId
+            );
+            if (match) return match;
+        }
+
+        // Priority 2: Check via components map (Instance ID -> Variant Metadata -> Set ID -> Set Metadata)
+        if (componentId && components && components[componentId] && componentSets) {
+            const variantMetadata = components[componentId];
+            if (variantMetadata.componentSetId && componentSets[variantMetadata.componentSetId]) {
+                const setMetadata = componentSets[variantMetadata.componentSetId];
+                const match = this.config.components.find(def =>
+                    def.figmaId === setMetadata.name || def.figmaId === variantMetadata.componentSetId
+                );
+                if (match) return match;
+            }
+        }
+
+        // Priority 3: Standard check
         return this.config.components.find(def =>
             def.figmaId === componentId || def.figmaId === componentName
         );

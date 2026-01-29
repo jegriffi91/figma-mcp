@@ -6,7 +6,7 @@ import { FigmaNode, FigmaAlignItems, FigmaSolidFill } from '../../figma/types';
  * Respects layoutMode and uses DS spacing tokens.
  */
 export class FrameTranslator implements ComponentTranslator {
-    canHandle(node: FigmaNode): boolean {
+    canHandle(node: FigmaNode, _context?: Partial<TranslationContext>): boolean {
         return node.type === 'FRAME' || node.type === 'GROUP' || node.type === 'COMPONENT' || node.type === 'INSTANCE';
     }
 
@@ -351,7 +351,7 @@ export class FrameTranslator implements ComponentTranslator {
  * Translates TEXT nodes to SwiftUI Text views with styling.
  */
 export class TextTranslator implements ComponentTranslator {
-    canHandle(node: FigmaNode): boolean {
+    canHandle(node: FigmaNode, _context?: Partial<TranslationContext>): boolean {
         return node.type === 'TEXT';
     }
 

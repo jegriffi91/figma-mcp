@@ -26,9 +26,11 @@ export class TranslatorRegistry {
             tokenResolver: this.tokenResolver,
             depth: context?.depth ?? 0,
             indentionLevel: context?.indentionLevel ?? 0,
+            components: context?.components,
+            componentSets: context?.componentSets,
         };
 
-        const translator = this.translators.find(t => t.canHandle(node));
+        const translator = this.translators.find(t => t.canHandle(node, fullContext));
 
         if (translator) {
             return translator.translate(node, fullContext);

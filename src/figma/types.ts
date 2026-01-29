@@ -159,6 +159,29 @@ export interface FigmaNode {
     componentProperties?: Record<string, FigmaComponentProperty>;
 }
 
+export interface FigmaComponentMetadata {
+    key: string;
+    name: string;
+    description: string;
+    remote?: boolean;
+    componentSetId?: string;
+    documentationLinks?: unknown[];
+}
+
+export interface FigmaComponentSetMetadata {
+    key: string;
+    name: string;
+    description: string;
+    remote?: boolean;
+    documentationLinks?: unknown[];
+}
+
+export interface FigmaNodeData {
+    document: FigmaNode;
+    components: Record<string, FigmaComponentMetadata>;
+    componentSets: Record<string, FigmaComponentSetMetadata>;
+}
+
 export interface ImageExportResult {
     imageUrl: string;
     base64Data: string;
@@ -167,7 +190,7 @@ export interface ImageExportResult {
 }
 
 export interface FigmaDataSource {
-    getNode(fileKey: string, nodeId: string): Promise<FigmaNode>;
+    getNode(fileKey: string, nodeId: string): Promise<FigmaNodeData>;
     getNodeImage?(fileKey: string, nodeId: string, scale?: number): Promise<ImageExportResult>;
 }
 
@@ -175,6 +198,8 @@ export interface FigmaApiResponse {
     nodes: {
         [key: string]: {
             document: FigmaNode;
+            components?: Record<string, FigmaComponentMetadata>;
+            componentSets?: Record<string, FigmaComponentSetMetadata>;
         };
     };
 }

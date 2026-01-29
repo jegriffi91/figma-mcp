@@ -1,7 +1,7 @@
 import axios from 'axios';
-import { FigmaDataSource, FigmaNode, FigmaApiResponse, ImageExportResult } from './types';
+import { FigmaDataSource, FigmaNode, FigmaNodeData, FigmaApiResponse, ImageExportResult } from './types';
 import { config } from '../config';
-import sampleNode from './mocks/sample_node.json';
+import sampleNode from './mocks/sample_node_v2.json';
 
 export class RemoteFigmaClient implements FigmaDataSource {
     private accessToken: string;
@@ -11,7 +11,7 @@ export class RemoteFigmaClient implements FigmaDataSource {
         this.accessToken = accessToken;
     }
 
-    async getNode(fileKey: string, nodeId: string): Promise<FigmaNode> {
+    async getNode(fileKey: string, nodeId: string): Promise<FigmaNodeData> {
         try {
             const response = await axios.get<FigmaApiResponse>(
                 `${this.baseUrl}/files/${fileKey}/nodes?ids=${encodeURIComponent(nodeId)}`,
@@ -27,7 +27,11 @@ export class RemoteFigmaClient implements FigmaDataSource {
                 throw new Error(`Node ${nodeId} not found in file ${fileKey}`);
             }
 
-            return nodeData.document;
+            return {
+                document: nodeData.document,
+                components: nodeData.components || {},
+                componentSets: nodeData.componentSets || {}
+            };
         } catch (error: any) {
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(`Figma API Error: ${error.response.status} - ${JSON.stringify(error.response.data)}`);
@@ -59,9 +63,9 @@ export class RemoteFigmaClient implements FigmaDataSource {
             });
 
             // 3. Get dimensions from the node
-            const node = await this.getNode(fileKey, nodeId);
-            const width = node.absoluteBoundingBox?.width ?? 0;
-            const height = node.absoluteBoundingBox?.height ?? 0;
+            const nodeData = await this.getNode(fileKey, nodeId);
+            const width = nodeData.document.absoluteBoundingBox?.width ?? 0;
+            const height = nodeData.document.absoluteBoundingBox?.height ?? 0;
 
             // 4. Convert to base64
             const base64Data = Buffer.from(imageResponse.data).toString('base64');
@@ -82,10 +86,51 @@ export class RemoteFigmaClient implements FigmaDataSource {
 }
 
 export class MockFigmaClient implements FigmaDataSource {
-    async getNode(fileKey: string, nodeId: string): Promise<FigmaNode> {
+    async getNode(fileKey: string, nodeId: string): Promise<FigmaNodeData> {
         console.log(`[MockFigmaClient] Fetching node ${nodeId} from file ${fileKey}`);
-        // In a real mock, we might switch based on ID, but for now return sample
-        return sampleNode as unknown as FigmaNode;
+        const sample = sampleNode as any;
+
+        // Check if sample has the Figma API response structure with nodes
+        if (sample.nodes) {
+            // Try to find the requested nodeId first
+            if (sample.nodes[nodeId]) {
+                const nodeEntry = sample.nodes[nodeId];
+                return {
+                    document: nodeEntry.document,
+                    components: nodeEntry.components || {},
+                    componentSets: nodeEntry.componentSets || {}
+                };
+            }
+
+            // Fallback: Use the first available node from the sample
+            const availableNodeIds = Object.keys(sample.nodes);
+            if (availableNodeIds.length > 0) {
+                const firstNodeId = availableNodeIds[0];
+                console.log(`[MockFigmaClient] Node ${nodeId} not found, using ${firstNodeId}`);
+                const nodeEntry = sample.nodes[firstNodeId];
+                return {
+                    document: nodeEntry.document,
+                    components: nodeEntry.components || {},
+                    componentSets: nodeEntry.componentSets || {}
+                };
+            }
+        }
+
+        // Legacy structure: sample is the node entry itself
+        if (sample.document) {
+            return {
+                document: sample.document,
+                components: sample.components || {},
+                componentSets: sample.componentSets || {}
+            };
+        }
+
+        // Fallback: sample is just the document node
+        return {
+            document: sample as FigmaNode,
+            components: {},
+            componentSets: {}
+        };
     }
 }
 
