@@ -157,8 +157,9 @@ class FigmaMcpServer {
             try {
                 console.error(`[Tool] figma_to_swiftui called for node ${args.node_id} in file ${args.file_key}`);
 
-                // 1. Fetch Node
-                const node = await this.figmaClient.getNode(args.file_key, args.node_id);
+                // 1. Fetch Node Data (includes document, components, componentSets)
+                const nodeData = await this.figmaClient.getNode(args.file_key, args.node_id);
+                const node = nodeData.document;
 
                 // 2. Translate Node
                 const swiftUICode = this.registry.translate(node);
@@ -204,7 +205,8 @@ class FigmaMcpServer {
             const imageResult = await this.figmaClient.getNodeImage(args.file_key, args.node_id, scale);
 
             // 2. Fetch node metadata
-            const node = await this.figmaClient.getNode(args.file_key, args.node_id);
+            const nodeData = await this.figmaClient.getNode(args.file_key, args.node_id);
+            const node = nodeData.document;
 
             // 3. Extract flattened metadata
             const metadata = this.visionExtractor!.extract(node);
