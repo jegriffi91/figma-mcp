@@ -7,6 +7,8 @@ import {
     McpError,
 } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
+import fs from 'fs';
+import path from 'path';
 import { config } from './config';
 import { getFigmaClient } from './figma/client';
 import { TranslatorRegistry } from './translator/registry';
@@ -16,6 +18,8 @@ import { DesignSystemLoader } from './core/loader';
 import { ConfigurableComponentTranslator } from './translator/swiftui/configurable_component';
 import { PlaceholderTranslator } from './translator/swiftui/placeholder_translator';
 import { VisionContextExtractor } from './translator/vision_context';
+import { discoverComponents, mergeComponents } from './core/component_discovery';
+import { ComponentConfigurationSchema } from './core/schemas';
 
 /**
  * Figma MCP Server
@@ -236,6 +240,74 @@ class FigmaMcpServer {
             };
         } catch (error: any) {
             console.error(`[Error] Vision translate failed:`, error);
+            return {
+                content: [
+                    {
+                        type: 'text',
+                        text: `Error: ${error.message}`,
+                    },
+                ],
+                isError: true,
+            };
+        }
+    }
+
+    private async handleDiscoverComponents(args: { file_key: string; node_id: string; config_path?: string }) {
+        if (!args.file_key || !args.node_id) {
+            throw new McpError(ErrorCode.InvalidParams, 'Missing required arguments: file_key, node_id');
+        }
+
+        try {
+            console.error(`[Tool] discover_components called for node ${args.node_id} in file ${args.file_key}`);
+
+            // Default config path
+            const configPath = args.config_path || path.join(config.designSystemRoot, 'components.json');
+
+            // 1. Fetch node data from Figma
+            const nodeData = await this.figmaClient.getNode(args.file_key, args.node_id);
+
+            // 2. Discover components
+            const discovered = discoverComponents(
+                nodeData.document,
+                nodeData.components,
+                nodeData.componentSets
+            );
+
+            // 3. Load existing config or create empty one
+            let existingConfig = { handoffMode: true, components: [] as any[] };
+            if (fs.existsSync(configPath)) {
+                const content = fs.readFileSync(configPath, 'utf-8');
+                const parsed = JSON.parse(content);
+                existingConfig = ComponentConfigurationSchema.parse(parsed);
+            }
+
+            // 4. Merge components
+            const result = mergeComponents(existingConfig, discovered);
+
+            // 5. Write updated config
+            fs.writeFileSync(configPath, JSON.stringify(result.config, null, 2));
+
+            // 6. Return summary
+            const summary = {
+                configPath,
+                totalComponents: result.config.components.length,
+                added: result.added,
+                skipped: result.skipped,
+                message: result.added.length > 0
+                    ? `Added ${result.added.length} new component(s): ${result.added.join(', ')}`
+                    : 'No new components found to add.',
+            };
+
+            return {
+                content: [
+                    {
+                        type: 'text',
+                        text: JSON.stringify(summary, null, 2),
+                    },
+                ],
+            };
+        } catch (error: any) {
+            console.error(`[Error] Discover components failed:`, error);
             return {
                 content: [
                     {
