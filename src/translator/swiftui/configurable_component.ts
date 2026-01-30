@@ -73,7 +73,26 @@ export class ConfigurableComponentTranslator implements ComponentTranslator {
         const componentId = node.componentId;
         const componentName = node.componentName || node.name;
 
-        // Priority 1: Check componentSets via componentId directly (if instance points to set or variant matches set key)
+        // Resolve metadata from the root dictionaries
+        const componentMetadata = componentId ? components?.[componentId] : undefined;
+        const componentKey = componentMetadata?.key;
+        const componentSetId = componentMetadata?.componentSetId;
+        const componentSetMetadata = componentSetId ? componentSets?.[componentSetId] : undefined;
+        const componentSetKey = componentSetMetadata?.key;
+
+        // Priority 1: Match by stable component key (most reliable for specific variants)
+        if (componentKey) {
+            const match = this.config.components.find(def => def.figmaKey === componentKey);
+            if (match) return match;
+        }
+
+        // Priority 2: Match by stable componentSet key (matches any variant of the set)
+        if (componentSetKey) {
+            const match = this.config.components.find(def => def.figmaComponentSetKey === componentSetKey);
+            if (match) return match;
+        }
+
+        // Priority 3 (Backward Compatibility): Check componentSets via componentId directly
         if (componentId && componentSets && componentSets[componentId]) {
             const setMetadata = componentSets[componentId];
             const match = this.config.components.find(def =>
@@ -82,7 +101,7 @@ export class ConfigurableComponentTranslator implements ComponentTranslator {
             if (match) return match;
         }
 
-        // Priority 2: Check via components map (Instance ID -> Variant Metadata -> Set ID -> Set Metadata)
+        // Priority 4 (Backward Compatibility): Check via components map using figmaId
         if (componentId && components && components[componentId] && componentSets) {
             const variantMetadata = components[componentId];
             if (variantMetadata.componentSetId && componentSets[variantMetadata.componentSetId]) {
@@ -94,7 +113,7 @@ export class ConfigurableComponentTranslator implements ComponentTranslator {
             }
         }
 
-        // Priority 3: Standard check
+        // Priority 5 (Fallback): Standard figmaId or name check
         return this.config.components.find(def =>
             def.figmaId === componentId || def.figmaId === componentName
         );

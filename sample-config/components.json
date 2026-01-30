@@ -1,14 +1,143 @@
 {
-    "components": [
-        {
-            "figmaId": "test:button",
-            "figmaFileKey": "ABC123XYZ",
-            "swiftView": "DSButton",
-            "sourceFile": "Sources/DesignSystem/Button/DSButton.swift",
-            "params": {
-                "Label": "title",
-                "Variant": "style"
-            }
-        }
-    ]
+  "handoffMode": true,
+  "components": [
+    {
+      "figmaComponentSetKey": "4beabc4137f201f1b74e0cab5936841754c7f7c2",
+      "swiftView": "AtlasDivider",
+      "sourceFile": "TODO: Path to AtlasDivider.swift",
+      "params": {
+        "Direction": "direction",
+        "On Accent": "on Accent"
+      }
+    },
+    {
+      "figmaComponentSetKey": "e759779ef270bab1872fea0b9ab81efbd220212d",
+      "swiftView": "AtlasSection",
+      "sourceFile": "TODO: Path to AtlasSection.swift",
+      "params": {
+        "showSidePadding#120368:3": "showSidePadding",
+        "Position": "position"
+      }
+    },
+    {
+      "figmaComponentSetKey": "2ec181438e53fe46f241aec640454abc58a1c0e6",
+      "swiftView": "AtlasSectionTitle",
+      "sourceFile": "TODO: Path to AtlasSectionTitle.swift",
+      "params": {
+        "subtitle#17004:17": "subtitle",
+        "showAsset#26093:0": "showAsset",
+        "showSidePadding#52562:0": "showSidePadding",
+        "showSubtitle#17004:34": "showSubtitle",
+        "showButton2#31063:59": "showButton2",
+        "title#17004:0": "title",
+        "type": "type",
+        "size": "size",
+        "isLoading": "isLoading",
+        "isOnAccent": "isOnAccent"
+      }
+    },
+    {
+      "figmaComponentSetKey": "f92b0466057d33aa9f71dcd7de1df0b1dda721c6",
+      "swiftView": "AtlasAssetHolder",
+      "sourceFile": "TODO: Path to AtlasAssetHolder.swift",
+      "params": {
+        "initials#28864:39": "initials",
+        "type": "type",
+        "size": "size",
+        "isLoading": "isLoading",
+        "isDisabled": "isDisabled",
+        "hasFallbackImage": "hasFallbackImage"
+      }
+    },
+    {
+      "figmaComponentSetKey": "2869f135b5ded3bcb1122c0badd3114a227a0f82",
+      "swiftView": "AtlasButton",
+      "sourceFile": "TODO: Path to AtlasButton.swift",
+      "params": {
+        "hasFocus#30940:117": "hasFocus",
+        "hasIcon#8195:347": "hasIcon",
+        "label#8195:58": "label",
+        "type": "type",
+        "size": "size",
+        "state": "state",
+        "onAccent": "onAccent",
+        "isDisabled": "isDisabled",
+        "isLoading": "isLoading"
+      }
+    },
+    {
+      "figmaComponentSetKey": "fd46e26b43c626a6dbb781ba4a631b1633487b86",
+      "swiftView": "AtlasButtonGroup",
+      "sourceFile": "TODO: Path to AtlasButtonGroup.swift",
+      "params": {
+        "hasSecondaryButton#8843:111": "hasSecondaryButton",
+        "direction": "direction",
+        "isOnAccent": "isOnAccent"
+      }
+    },
+    {
+      "figmaComponentSetKey": "bccdc3392c8b7623a975214e7cb7f76b6f9188c9",
+      "swiftView": "AtlasButtonLink",
+      "sourceFile": "TODO: Path to AtlasButtonLink.swift",
+      "params": {
+        "hasFocus#30940:0": "hasFocus",
+        "hasIconLeading#8177:259": "hasIconLeading",
+        "hadsIconTrailing#8177:34": "hadsIconTrailing",
+        "label#8165:63": "label",
+        "type": "type",
+        "size": "size",
+        "state": "state",
+        "isOnAccent": "isOnAccent",
+        "isDisabled": "isDisabled",
+        "isLoading": "isLoading"
+      }
+    },
+    {
+      "figmaComponentSetKey": "604de8fe7d6a07f5158022841d18b44edd423626",
+      "swiftView": "AtlasHook",
+      "sourceFile": "TODO: Path to AtlasHook.swift",
+      "params": {
+        "legal#30965:33": "legal",
+        "showDismiss#59893:1": "showDismiss",
+        "showCTA#59893:2": "showCTA",
+        "showEyebrow#32303:7": "showEyebrow",
+        "showBody#26820:11": "showBody",
+        "showAdDisclosure#9966:9": "showAdDisclosure",
+        "showLegal#32302:1": "showLegal",
+        "showSecondButton#118668:0": "showSecondButton",
+        "hasFocus#107213:0": "hasFocus",
+        "body#8844:7": "body",
+        "eyebrow#32303:0": "eyebrow",
+        "title#8844:0": "title",
+        "size": "size",
+        "breakpoint": "breakpoint",
+        "state": "state",
+        "hasEmphasis": "hasEmphasis",
+        "graphicType": "graphicType",
+        "isLoading": "isLoading",
+        "isDisabled": "isDisabled"
+      }
+    },
+    {
+      "figmaComponentSetKey": "f7b7ebc95df9bc32e06f462f614ba917d574cffc",
+      "swiftView": "AtlasIcon",
+      "sourceFile": "TODO: Path to AtlasIcon.swift",
+      "params": {
+        "size": "size",
+        "state": "state",
+        "isOnAccent": "isOnAccent",
+        "isLoading": "isLoading",
+        "isDisabled": "isDisabled"
+      }
+    },
+    {
+      "figmaComponentSetKey": "11891298eaad178258c9c1e76470c7d4ff163ca1",
+      "swiftView": "WebFocus",
+      "sourceFile": "TODO: Path to WebFocus.swift",
+      "params": {
+        "Corner Radius": "corner Radius",
+        "On Accent": "on Accent"
+      }
+    }
+  ]
 }

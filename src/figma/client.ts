@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { FigmaDataSource, FigmaNode, FigmaNodeData, FigmaApiResponse, ImageExportResult } from './types';
 import { config } from '../config';
-import sampleNode from './mocks/sample_node_v2.json';
+import sampleNode from './mocks/sample_node-2.json';
 
 export class RemoteFigmaClient implements FigmaDataSource {
     private accessToken: string;
