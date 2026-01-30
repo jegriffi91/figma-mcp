@@ -135,6 +135,28 @@ class FigmaMcpServer {
                             required: ['file_key', 'node_id'],
                         },
                     },
+                    {
+                        name: 'discover_components',
+                        description: 'Discover new design system components from a Figma node and add them to components.json. Preserves existing mappings and only adds net-new components.',
+                        inputSchema: {
+                            type: 'object',
+                            properties: {
+                                file_key: {
+                                    type: 'string',
+                                    description: 'The key of the Figma file',
+                                },
+                                node_id: {
+                                    type: 'string',
+                                    description: 'The ID of the node to scan for components',
+                                },
+                                config_path: {
+                                    type: 'string',
+                                    description: 'Path to components.json (default: ./sample-config/components.json)',
+                                },
+                            },
+                            required: ['file_key', 'node_id'],
+                        },
+                    },
                 ],
             };
         });
@@ -147,6 +169,10 @@ class FigmaMcpServer {
             // Route to appropriate handler
             if (toolName === 'figma_vision_translate') {
                 return this.handleVisionTranslate(request.params.arguments as any);
+            }
+
+            if (toolName === 'discover_components') {
+                return this.handleDiscoverComponents(request.params.arguments as any);
             }
 
             if (toolName !== 'figma_to_swiftui') {

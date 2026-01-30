@@ -17,8 +17,16 @@ const getEnvVar = (key: string, required: boolean = false, defaultValue: string 
   return value || defaultValue;
 };
 
+// Get design system root - can be absolute or relative path
+// Set DESIGN_SYSTEM_ROOT env var to point to your project's design system config
+// Example: DESIGN_SYSTEM_ROOT=~/dev/DASH/ecw-ios/.design-system
+const designSystemRootRaw = getEnvVar('DESIGN_SYSTEM_ROOT', false, './sample-config');
+const designSystemRoot = designSystemRootRaw.startsWith('~')
+  ? designSystemRootRaw.replace('~', process.env.HOME || '')
+  : path.resolve(process.cwd(), designSystemRootRaw);
+
 export const config: Config = {
   figmaAccessToken: getEnvVar('FIGMA_ACCESS_TOKEN'),
   useMockFigma: getEnvVar('USE_MOCK_FIGMA', false, 'false') === 'true',
-  designSystemRoot: path.resolve(process.cwd(), getEnvVar('DESIGN_SYSTEM_ROOT', false, '../../Modules/DesignSystem')),
+  designSystemRoot,
 };
