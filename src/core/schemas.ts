@@ -43,8 +43,8 @@ export const TokenConfigurationSchema = z.object({
  * Component Schema Definitions
  * These define the structure of components.json
  * 
- * Streamlined: Just reference the Swift View name and map params.
- * The translator generates `SwiftViewName(param1: value1, param2: value2)`.
+ * Platform-specific: SwiftUI uses swiftView/sourceFile, Compose uses composeComposable/kotlinSourceFile.
+ * Each platform has its own separate config files.
  */
 
 export const ComponentDefinitionSchema = z.object({
@@ -52,12 +52,17 @@ export const ComponentDefinitionSchema = z.object({
     figmaKey: z.string().optional().describe("Stable Figma component key from components[].key - prioritized over figmaId"),
     figmaComponentSetKey: z.string().optional().describe("Stable Figma componentSet key from componentSets[].key - matches any variant of the set"),
     figmaFileKey: z.string().optional().describe("Figma file key where this component lives (for reference/automation)"),
-    swiftView: z.string().describe("The SwiftUI View struct name, e.g. 'DSButton'"),
+    // SwiftUI fields
+    swiftView: z.string().optional().describe("The SwiftUI View struct name, e.g. 'DSButton'"),
     sourceFile: z.string().optional().describe("Path to the Swift source file for reference"),
+    // Jetpack Compose fields
+    composeComposable: z.string().optional().describe("The Composable function name, e.g. 'AppButton'"),
+    kotlinSourceFile: z.string().optional().describe("Path to the Kotlin source file for reference"),
+    // Shared
     params: z.record(
         z.string(), // Figma Prop Name (e.g. 'Label')
-        z.string()  // Swift param name (e.g. 'title')
-    ).optional().describe("Maps Figma property names to Swift parameter names"),
+        z.string()  // Platform param name (e.g. 'title' for Swift, 'text' for Compose)
+    ).optional().describe("Maps Figma property names to platform parameter names"),
 });
 
 

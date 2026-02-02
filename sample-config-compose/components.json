@@ -1,0 +1,22 @@
+{
+    "handoffMode": true,
+    "components": [
+        {
+            "figmaKey": "example_button_key",
+            "composeComposable": "AppButton",
+            "kotlinSourceFile": "ui/components/AppButton.kt",
+            "params": {
+                "Label": "text",
+                "Variant": "variant"
+            }
+        },
+        {
+            "figmaComponentSetKey": "example_card_set_key",
+            "composeComposable": "AppCard",
+            "kotlinSourceFile": "ui/components/AppCard.kt",
+            "params": {
+                "Elevation": "elevation"
+            }
+        }
+    ]
+}

@@ -20,6 +20,10 @@ import { PlaceholderTranslator } from './translator/swiftui/placeholder_translat
 import { VisionContextExtractor } from './translator/vision_context';
 import { discoverComponents, mergeComponents } from './core/component_discovery';
 import { ComponentConfigurationSchema } from './core/schemas';
+// Compose translators
+import { ComposeLayoutTranslator, ComposeTextTranslator } from './translator/compose/primitives';
+import { ComposeConfigurableComponentTranslator } from './translator/compose/configurable_component';
+import { ComposePlaceholderTranslator } from './translator/compose/placeholder_translator';
 
 /**
  * Figma MCP Server
@@ -28,8 +32,9 @@ import { ComponentConfigurationSchema } from './core/schemas';
 class FigmaMcpServer {
     private server: Server;
     private figmaClient = getFigmaClient();
-    private registry!: TranslatorRegistry; // Initialized in initialize()
-    private visionExtractor?: VisionContextExtractor; // Initialized in initialize()
+    private registry!: TranslatorRegistry; // SwiftUI registry
+    private composeRegistry!: TranslatorRegistry; // Compose registry
+    private visionExtractor?: VisionContextExtractor;
 
     constructor() {
         this.server = new Server(
@@ -49,37 +54,47 @@ class FigmaMcpServer {
     }
 
     async initialize(): Promise<void> {
-        // Load Design System Configuration
+        // Load Design System Configuration (SwiftUI)
         const loader = new DesignSystemLoader(config.designSystemRoot);
 
-        console.error(`[Init] Loading Design System from: ${config.designSystemRoot}`);
+        console.error(`[Init] Loading SwiftUI Design System from: ${config.designSystemRoot}`);
         const tokens = await loader.loadTokens();
         const components = await loader.loadComponents();
 
-        // Initialize Registry with loaded tokens
-        // We recreate the registry here because we need the async loaded tokens
-        // A better approach in refactor would be to make registry async or having a 'configure' method
+        // Initialize SwiftUI Registry with loaded tokens
         const tokenResolver = new DesignTokenResolver(tokens);
         this.registry = new TranslatorRegistry(tokenResolver);
         this.visionExtractor = new VisionContextExtractor(tokenResolver);
 
-        // Register Translators
-
-        // 1. Dynamic Configurable Translator (Highest Priority for matched known IDs)
+        // Register SwiftUI Translators
         if (components.components.length > 0) {
-            console.error(`[Init] Registering ${components.components.length} configurable components`);
+            console.error(`[Init] Registering ${components.components.length} SwiftUI configurable components`);
             this.registry.register(new ConfigurableComponentTranslator(components));
         }
-
-        // 2. Placeholder for unknown components (handoff mode)
         this.registry.register(new PlaceholderTranslator());
-
-        // 3. Generic Primitives
         this.registry.register(new TextTranslator());
         this.registry.register(new FrameTranslator());
-
-        // 4. Fallback
         this.registry.setFallback(new FrameTranslator());
+
+        // Load Compose Design System Configuration
+        const composeLoader = new DesignSystemLoader(config.designSystemRootCompose);
+        console.error(`[Init] Loading Compose Design System from: ${config.designSystemRootCompose}`);
+        const composeTokens = await composeLoader.loadTokens();
+        const composeComponents = await composeLoader.loadComponents();
+
+        // Initialize Compose Registry
+        const composeTokenResolver = new DesignTokenResolver(composeTokens);
+        this.composeRegistry = new TranslatorRegistry(composeTokenResolver);
+
+        // Register Compose Translators
+        if (composeComponents.components.length > 0) {
+            console.error(`[Init] Registering ${composeComponents.components.length} Compose configurable components`);
+            this.composeRegistry.register(new ComposeConfigurableComponentTranslator(composeComponents));
+        }
+        this.composeRegistry.register(new ComposePlaceholderTranslator());
+        this.composeRegistry.register(new ComposeTextTranslator());
+        this.composeRegistry.register(new ComposeLayoutTranslator());
+        this.composeRegistry.setFallback(new ComposeLayoutTranslator());
     }
 
     private setupHandlers() {
@@ -157,6 +172,28 @@ class FigmaMcpServer {
                             required: ['file_key', 'node_id'],
                         },
                     },
+                    {
+                        name: 'figma_to_compose',
+                        description: 'Fetches a node from Figma and converts it to Jetpack Compose code based on the internal design system configuration.',
+                        inputSchema: {
+                            type: 'object',
+                            properties: {
+                                file_key: {
+                                    type: 'string',
+                                    description: 'The key of the Figma file',
+                                },
+                                node_id: {
+                                    type: 'string',
+                                    description: 'The ID of the node to translate (e.g., "1:2")',
+                                },
+                                handoff_mode: {
+                                    type: 'boolean',
+                                    description: 'Generate scaffold with TODOs instead of full implementations (default: true)',
+                                },
+                            },
+                            required: ['file_key', 'node_id'],
+                        },
+                    },
                 ],
             };
         });
@@ -173,6 +210,10 @@ class FigmaMcpServer {
 
             if (toolName === 'discover_components') {
                 return this.handleDiscoverComponents(request.params.arguments as any);
+            }
+
+            if (toolName === 'figma_to_compose') {
+                return this.handleFigmaToCompose(request.params.arguments as any);
             }
 
             if (toolName !== 'figma_to_swiftui') {
@@ -215,6 +256,43 @@ class FigmaMcpServer {
                 };
             }
         });
+    }
+
+    private async handleFigmaToCompose(args: { file_key: string; node_id: string }) {
+        if (!args.file_key || !args.node_id) {
+            throw new McpError(ErrorCode.InvalidParams, 'Missing required arguments: file_key, node_id');
+        }
+
+        try {
+            console.error(`[Tool] figma_to_compose called for node ${args.node_id} in file ${args.file_key}`);
+
+            // 1. Fetch Node Data (includes document, components, componentSets)
+            const nodeData = await this.figmaClient.getNode(args.file_key, args.node_id);
+            const node = nodeData.document;
+
+            // 2. Translate Node using Compose registry
+            const composeCode = this.composeRegistry.translate(node);
+
+            return {
+                content: [
+                    {
+                        type: 'text',
+                        text: composeCode,
+                    },
+                ],
+            };
+        } catch (error: any) {
+            console.error(`[Error] figma_to_compose failed:`, error);
+            return {
+                content: [
+                    {
+                        type: 'text',
+                        text: `Error: ${error.message}`,
+                    },
+                ],
+                isError: true,
+            };
+        }
     }
 
     private async handleVisionTranslate(args: { file_key: string; node_id: string; scale?: number }) {
