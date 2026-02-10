@@ -103,6 +103,9 @@ export interface FigmaNode {
     componentId?: string;           // ID of the main component
     componentName?: string;         // Name of the main component
 
+    // Visibility
+    visible?: boolean;
+
     // Layout properties (Auto Layout)
     layoutMode?: FigmaLayoutMode;
     primaryAxisSizingMode?: 'FIXED' | 'AUTO';

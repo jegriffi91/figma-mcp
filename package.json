@@ -23,11 +23,13 @@
     "@types/node": "^25.0.10",
     "axios": "^1.13.2",
     "dotenv": "^17.2.3",
+    "sharp": "^0.34.5",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3",
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@types/sharp": "^0.31.1",
     "@typescript-eslint/eslint-plugin": "^8.53.1",
     "@typescript-eslint/parser": "^8.53.1",
     "eslint": "^9.39.2",

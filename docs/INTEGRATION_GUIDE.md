@@ -193,13 +193,26 @@ Update your MCP configuration to point to your config directory.
 
 1. **Restart your IDE** (or reload the Copilot extension)
 2. **Test with a Figma node**:
+   > "Use figma_get_node_data to inspect node '12345:67890'."
    > "Translate Figma node '12345:67890' from file 'ABC123XYZ' into SwiftUI."
 
 3. **Check logs** for confirmation:
    ```
    [Init] Loading Design System from: /Users/you/my-design-system-config
    [Init] Registering 2 configurable components
+   [Tool] figma_get_node_data called for node...
    ```
+
+---
+
+## Token-Efficient Workflow (Best Practice)
+
+To minimize token usage and costs, we recommend the following workflow for agents:
+
+1.  **Explore**: Call `figma_get_node_data` to get the "pruned" metadata schema. This uses very few tokens (~1KB) and provides the structural hierarchy and text content.
+2.  **Generate**: If the metadata is sufficient (e.g., standard lists, text blocks), generating code immediately.
+3.  **Snapshot (Optional)**: If the layout is complex or "vibe" dependent, call `figma_get_node_snapshot`. This returns an optimized 512px WebP image + metadata. Use this only when necessary.
+
 
 ---
 

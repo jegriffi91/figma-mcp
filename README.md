@@ -23,7 +23,8 @@ The server exposes the following tools to MCP-compatible clients:
 |------|-------------|
 | `figma_to_swiftui` | Fetches a Figma node and converts it to SwiftUI. Use `handoff_mode: true` (default) for scaffolds or `false` for full implementations. |
 | `figma_to_compose` | Fetches a Figma node and converts it to Jetpack Compose. Uses separate `DESIGN_SYSTEM_ROOT_COMPOSE` configuration. |
-| `figma_vision_translate` | Exports a Figma node as a PNG image and extracts metadata (colors, typography, spacing) for vision-based generation. |
+| `figma_get_node_data` | **LOW COST**. Retrieves standard metadata (name, text, simple colors) for exploring the node hierarchy. Use this first. |
+| `figma_get_node_snapshot` | **EXPENSIVE**. Retrieves a visual snapshot (WebP) AND metadata. Use only when visual layout/vibe is needed. Replaces `figma_vision_translate`. |
 | `discover_components` | Scans a Figma node/file for reusable components and adds them to your `components.json` configuration. |
 
 ---
@@ -76,7 +77,10 @@ Quickly generate the foundation of a new screen. The server will use your design
 Use `discover_components` to identify inconsistencies between your Figma designs and implemented components. It helps keep your `components.json` mapping in sync with design updates.
 
 ### 🎨 Vision-First Generation
-For complex layouts where JSON hierarchy alone is insufficient, use `figma_vision_translate`. This allows an AI agent to "see" the design while having access to the exact metadata (spacing, font names), leading to more accurate layout inference.
+For complex layouts where JSON hierarchy alone is insufficient, use `figma_get_node_snapshot`. This allows an AI agent to "see" the design (via optimized 512px WebP) while having access to the exact metadata (spacing, font names), leading to more accurate layout inference.
+
+### ⚡️ Efficient Exploration
+Use `figma_get_node_data` to quickly explore the node hierarchy without incurring the cost of image generation or massive JSON payloads. This tool returns a pruned, token-efficient schema.
 
 ### 🚀 Developer Handoff
 Generate code with clear `// TODO` markers for logic and state. This accelerates the "boring" parts of UI implementation while leaving the critical architectural decisions to the developer.

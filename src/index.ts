@@ -20,6 +20,10 @@ import { PlaceholderTranslator } from './translator/swiftui/placeholder_translat
 import { VisionContextExtractor } from './translator/vision_context';
 import { discoverComponents, mergeComponents } from './core/component_discovery';
 import { ComponentConfigurationSchema } from './core/schemas';
+// Optimization Utilities
+import { pruneNodeData } from './core/optimization';
+import { optimizeForCli } from './core/image_processor';
+
 // Compose translators
 import { ComposeLayoutTranslator, ComposeTextTranslator } from './translator/compose/primitives';
 import { ComposeConfigurableComponentTranslator } from './translator/compose/configurable_component';
@@ -107,45 +111,38 @@ class FigmaMcpServer {
             return {
                 tools: [
                     {
-                        name: 'figma_to_swiftui',
-                        description: 'Fetches a node from Figma and converts it to SwiftUI code based on the internal design system stub.',
+                        name: 'figma_get_node_data',
+                        description: 'Retrieves standard metadata (name, type, text, simple colors) for a Figma node. LOW COST. Use this FIRST to explore the node hierarchy or get content.',
                         inputSchema: {
                             type: 'object',
                             properties: {
-                                file_key: {
-                                    type: 'string',
-                                    description: 'The key of the Figma file',
-                                },
-                                node_id: {
-                                    type: 'string',
-                                    description: 'The ID of the node to translate (e.g., "1:2")',
-                                },
-                                handoff_mode: {
-                                    type: 'boolean',
-                                    description: 'Generate scaffold with TODOs instead of full implementations (default: true)',
-                                },
+                                file_key: { type: 'string', description: 'The key of the Figma file' },
+                                node_id: { type: 'string', description: 'The ID of the node to inspect' },
                             },
                             required: ['file_key', 'node_id'],
                         },
                     },
                     {
-                        name: 'figma_vision_translate',
-                        description: 'Exports a Figma node as PNG image with extracted metadata for vision-based SwiftUI generation. Returns base64 image + colors/typography/spacing data.',
+                        name: 'figma_get_node_snapshot',
+                        description: 'Retrieves a visual snapshot AND metadata for a Figma node. EXPENSIVE. Use ONLY when you need to see layout, specific styling details, or "vibe" that metadata cannot capture. Returns pruned JSON and WebP image.',
                         inputSchema: {
                             type: 'object',
                             properties: {
-                                file_key: {
-                                    type: 'string',
-                                    description: 'The key of the Figma file',
-                                },
-                                node_id: {
-                                    type: 'string',
-                                    description: 'The ID of the node to export (e.g., "1:2")',
-                                },
-                                scale: {
-                                    type: 'number',
-                                    description: 'Export scale factor (1-4), default 2',
-                                },
+                                file_key: { type: 'string', description: 'The key of the Figma file' },
+                                node_id: { type: 'string', description: 'The ID of the node to snapshot' },
+                            },
+                            required: ['file_key', 'node_id'],
+                        },
+                    },
+                    {
+                        name: 'figma_to_swiftui',
+                        description: 'Fetches a node from Figma and converts it to SwiftUI code based on the internal design system stub.',
+                        inputSchema: {
+                            type: 'object',
+                            properties: {
+                                file_key: { type: 'string', description: 'The key of the Figma file' },
+                                node_id: { type: 'string', description: 'The ID of the node to translate (e.g., "1:2")' },
+                                handoff_mode: { type: 'boolean', description: 'Generate scaffold with TODOs instead of full implementations (default: true)' },
                             },
                             required: ['file_key', 'node_id'],
                         },
@@ -156,18 +153,9 @@ class FigmaMcpServer {
                         inputSchema: {
                             type: 'object',
                             properties: {
-                                file_key: {
-                                    type: 'string',
-                                    description: 'The key of the Figma file',
-                                },
-                                node_id: {
-                                    type: 'string',
-                                    description: 'The ID of the node to scan for components',
-                                },
-                                config_path: {
-                                    type: 'string',
-                                    description: 'Path to components.json (default: ./sample-config/components.json)',
-                                },
+                                file_key: { type: 'string', description: 'The key of the Figma file' },
+                                node_id: { type: 'string', description: 'The ID of the node to scan for components' },
+                                config_path: { type: 'string', description: 'Path to components.json (default: ./sample-config/components.json)' },
                             },
                             required: ['file_key', 'node_id'],
                         },
@@ -178,18 +166,9 @@ class FigmaMcpServer {
                         inputSchema: {
                             type: 'object',
                             properties: {
-                                file_key: {
-                                    type: 'string',
-                                    description: 'The key of the Figma file',
-                                },
-                                node_id: {
-                                    type: 'string',
-                                    description: 'The ID of the node to translate (e.g., "1:2")',
-                                },
-                                handoff_mode: {
-                                    type: 'boolean',
-                                    description: 'Generate scaffold with TODOs instead of full implementations (default: true)',
-                                },
+                                file_key: { type: 'string', description: 'The key of the Figma file' },
+                                node_id: { type: 'string', description: 'The ID of the node to translate (e.g., "1:2")' },
+                                handoff_mode: { type: 'boolean', description: 'Generate scaffold with TODOs instead of full implementations (default: true)' },
                             },
                             required: ['file_key', 'node_id'],
                         },
@@ -204,8 +183,18 @@ class FigmaMcpServer {
             const toolName = request.params.name;
 
             // Route to appropriate handler
+            if (toolName === 'figma_get_node_data') {
+                return this.handleGetNodeData(request.params.arguments as any);
+            }
+
+            if (toolName === 'figma_get_node_snapshot') {
+                return this.handleGetNodeSnapshot(request.params.arguments as any);
+            }
+
+            // Legacy Support/Alias
             if (toolName === 'figma_vision_translate') {
-                return this.handleVisionTranslate(request.params.arguments as any);
+                console.error('[Deprecation Warning] figma_vision_translate is deprecated. Redirecting to figma_get_node_snapshot.');
+                return this.handleGetNodeSnapshot(request.params.arguments as any);
             }
 
             if (toolName === 'discover_components') {
@@ -258,6 +247,85 @@ class FigmaMcpServer {
         });
     }
 
+    private async handleGetNodeData(args: { file_key: string; node_id: string }) {
+        if (!args.file_key || !args.node_id) {
+            throw new McpError(ErrorCode.InvalidParams, 'Missing required arguments: file_key, node_id');
+        }
+
+        try {
+            console.error(`[Tool] figma_get_node_data called for node ${args.node_id} in file ${args.file_key}`);
+            const nodeData = await this.figmaClient.getNode(args.file_key, args.node_id);
+            const pruned = pruneNodeData(nodeData.document);
+
+            return {
+                content: [
+                    {
+                        type: 'text',
+                        text: JSON.stringify(pruned, null, 2),
+                    },
+                    {
+                        type: 'text',
+                        text: `[Visuals] To view layout and "vibe", call "figma_get_node_snapshot".`
+                    }
+                ],
+            };
+
+        } catch (error: any) {
+            console.error(`[Error] figma_get_node_data failed:`, error);
+            return {
+                content: [{ type: 'text', text: `Error: ${error.message}` }],
+                isError: true,
+            };
+        }
+    }
+
+    private async handleGetNodeSnapshot(args: { file_key: string; node_id: string }) {
+        if (!args.file_key || !args.node_id) {
+            throw new McpError(ErrorCode.InvalidParams, 'Missing required arguments: file_key, node_id');
+        }
+
+        try {
+            console.error(`[Tool] figma_get_node_snapshot called for node ${args.node_id} in file ${args.file_key}`);
+
+            // 1. Fetch Node Data
+            const nodeData = await this.figmaClient.getNode(args.file_key, args.node_id);
+            const pruned = pruneNodeData(nodeData.document);
+
+            // 2. Fetch Image (Scale 2.0 for quality)
+            let imageBase64: string | null = null;
+            if (this.figmaClient.getNodeImage) {
+                const imageResult = await this.figmaClient.getNodeImage(args.file_key, args.node_id, 2.0);
+                const buffer = Buffer.from(imageResult.base64Data, 'base64');
+
+                // 3. Optimize Image
+                const optimizedBuffer = await optimizeForCli(buffer);
+                imageBase64 = optimizedBuffer.toString('base64');
+            } else {
+                imageBase64 = "[Mock Image Data]";
+            }
+
+            return {
+                content: [
+                    {
+                        type: 'text',
+                        text: JSON.stringify(pruned, null, 2),
+                    },
+                    {
+                        type: 'image',
+                        data: imageBase64 || '',
+                        mimeType: 'image/webp'
+                    }
+                ],
+            };
+        } catch (error: any) {
+            console.error(`[Error] figma_get_node_snapshot failed:`, error);
+            return {
+                content: [{ type: 'text', text: `Error: ${error.message}` }],
+                isError: true,
+            };
+        }
+    }
+
     private async handleFigmaToCompose(args: { file_key: string; node_id: string }) {
         if (!args.file_key || !args.node_id) {
             throw new McpError(ErrorCode.InvalidParams, 'Missing required arguments: file_key, node_id');
@@ -283,67 +351,6 @@ class FigmaMcpServer {
             };
         } catch (error: any) {
             console.error(`[Error] figma_to_compose failed:`, error);
-            return {
-                content: [
-                    {
-                        type: 'text',
-                        text: `Error: ${error.message}`,
-                    },
-                ],
-                isError: true,
-            };
-        }
-    }
-
-    private async handleVisionTranslate(args: { file_key: string; node_id: string; scale?: number }) {
-        if (!args.file_key || !args.node_id) {
-            throw new McpError(ErrorCode.InvalidParams, 'Missing required arguments: file_key, node_id');
-        }
-
-        try {
-            console.error(`[Tool] figma_vision_translate called for node ${args.node_id} in file ${args.file_key}`);
-            const scale = args.scale ?? 2;
-
-            // Check if client supports image export
-            if (!this.figmaClient.getNodeImage) {
-                throw new Error('Image export not supported in mock mode. Use real Figma client.');
-            }
-
-            // 1. Export node as image
-            const imageResult = await this.figmaClient.getNodeImage(args.file_key, args.node_id, scale);
-
-            // 2. Fetch node metadata
-            const nodeData = await this.figmaClient.getNode(args.file_key, args.node_id);
-            const node = nodeData.document;
-
-            // 3. Extract flattened metadata
-            const metadata = this.visionExtractor!.extract(node);
-
-            // 4. Generate analysis prompt
-            const prompt = this.visionExtractor!.generateAnalysisPrompt(node.name, metadata);
-
-            // 5. Return structured payload
-            const payload = {
-                image: {
-                    base64: imageResult.base64Data,
-                    width: imageResult.width,
-                    height: imageResult.height,
-                    mimeType: 'image/png',
-                },
-                metadata,
-                prompt,
-            };
-
-            return {
-                content: [
-                    {
-                        type: 'text',
-                        text: JSON.stringify(payload, null, 2),
-                    },
-                ],
-            };
-        } catch (error: any) {
-            console.error(`[Error] Vision translate failed:`, error);
             return {
                 content: [
                     {
