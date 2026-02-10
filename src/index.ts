@@ -17,7 +17,6 @@ import { FrameTranslator, TextTranslator } from './translator/swiftui/primitives
 import { DesignSystemLoader } from './core/loader';
 import { ConfigurableComponentTranslator } from './translator/swiftui/configurable_component';
 import { PlaceholderTranslator } from './translator/swiftui/placeholder_translator';
-import { VisionContextExtractor } from './translator/vision_context';
 import { discoverComponents, mergeComponents } from './core/component_discovery';
 import { ComponentConfigurationSchema } from './core/schemas';
 // Optimization Utilities
@@ -38,7 +37,6 @@ class FigmaMcpServer {
     private figmaClient = getFigmaClient();
     private registry!: TranslatorRegistry; // SwiftUI registry
     private composeRegistry!: TranslatorRegistry; // Compose registry
-    private visionExtractor?: VisionContextExtractor;
 
     constructor() {
         this.server = new Server(
@@ -68,7 +66,6 @@ class FigmaMcpServer {
         // Initialize SwiftUI Registry with loaded tokens
         const tokenResolver = new DesignTokenResolver(tokens);
         this.registry = new TranslatorRegistry(tokenResolver);
-        this.visionExtractor = new VisionContextExtractor(tokenResolver);
 
         // Register SwiftUI Translators
         if (components.components.length > 0) {
@@ -112,7 +109,7 @@ class FigmaMcpServer {
                 tools: [
                     {
                         name: 'figma_get_node_data',
-                        description: 'Retrieves standard metadata (name, type, text, simple colors) for a Figma node. LOW COST. Use this FIRST to explore the node hierarchy or get content.',
+                        description: 'STAGE 1: EXPLORE. Retrieves standard metadata (name, type, text, simple colors) for a Figma node. LOW COST. Use this FIRST to explore the node hierarchy or get content.',
                         inputSchema: {
                             type: 'object',
                             properties: {
@@ -124,7 +121,7 @@ class FigmaMcpServer {
                     },
                     {
                         name: 'figma_get_node_snapshot',
-                        description: 'Retrieves a visual snapshot AND metadata for a Figma node. EXPENSIVE. Use ONLY when you need to see layout, specific styling details, or "vibe" that metadata cannot capture. Returns pruned JSON and WebP image.',
+                        description: 'STAGE 2: VISUALIZE. Retrieves a visual snapshot AND metadata for a Figma node. EXPENSIVE. Use ONLY when you need to see layout, specific styling details, or "vibe" that metadata cannot capture. Returns pruned JSON and WebP image.',
                         inputSchema: {
                             type: 'object',
                             properties: {
@@ -136,7 +133,20 @@ class FigmaMcpServer {
                     },
                     {
                         name: 'figma_to_swiftui',
-                        description: 'Fetches a node from Figma and converts it to SwiftUI code based on the internal design system stub.',
+                        description: 'STAGE 3: GENERATE (SWIFTUI). Fetches a node from Figma and converts it to SwiftUI code based on the internal design system stub. Best used after exploring node metadata.',
+                        inputSchema: {
+                            type: 'object',
+                            properties: {
+                                file_key: { type: 'string', description: 'The key of the Figma file' },
+                                node_id: { type: 'string', description: 'The ID of the node to translate (e.g., "1:2")' },
+                                handoff_mode: { type: 'boolean', description: 'Generate scaffold with TODOs instead of full implementations (default: true)' },
+                            },
+                            required: ['file_key', 'node_id'],
+                        },
+                    },
+                    {
+                        name: 'figma_to_compose',
+                        description: 'STAGE 3: GENERATE (ANDROID). Fetches a node from Figma and converts it to Jetpack Compose code based on the internal design system configuration. Best used after exploring node metadata.',
                         inputSchema: {
                             type: 'object',
                             properties: {
@@ -149,26 +159,13 @@ class FigmaMcpServer {
                     },
                     {
                         name: 'discover_components',
-                        description: 'Discover new design system components from a Figma node and add them to components.json. Preserves existing mappings and only adds net-new components.',
+                        description: 'MAINTENANCE: Discover new design system components from a Figma node and add them to components.json. Preserves existing mappings and only adds net-new components.',
                         inputSchema: {
                             type: 'object',
                             properties: {
                                 file_key: { type: 'string', description: 'The key of the Figma file' },
                                 node_id: { type: 'string', description: 'The ID of the node to scan for components' },
                                 config_path: { type: 'string', description: 'Path to components.json (default: ./sample-config/components.json)' },
-                            },
-                            required: ['file_key', 'node_id'],
-                        },
-                    },
-                    {
-                        name: 'figma_to_compose',
-                        description: 'Fetches a node from Figma and converts it to Jetpack Compose code based on the internal design system configuration.',
-                        inputSchema: {
-                            type: 'object',
-                            properties: {
-                                file_key: { type: 'string', description: 'The key of the Figma file' },
-                                node_id: { type: 'string', description: 'The ID of the node to translate (e.g., "1:2")' },
-                                handoff_mode: { type: 'boolean', description: 'Generate scaffold with TODOs instead of full implementations (default: true)' },
                             },
                             required: ['file_key', 'node_id'],
                         },
@@ -255,7 +252,7 @@ class FigmaMcpServer {
         try {
             console.error(`[Tool] figma_get_node_data called for node ${args.node_id} in file ${args.file_key}`);
             const nodeData = await this.figmaClient.getNode(args.file_key, args.node_id);
-            const pruned = pruneNodeData(nodeData.document);
+            const pruned = pruneNodeData(nodeData.document, this.registry.getTokenResolver());
 
             return {
                 content: [
@@ -287,21 +284,24 @@ class FigmaMcpServer {
         try {
             console.error(`[Tool] figma_get_node_snapshot called for node ${args.node_id} in file ${args.file_key}`);
 
-            // 1. Fetch Node Data
-            const nodeData = await this.figmaClient.getNode(args.file_key, args.node_id);
-            const pruned = pruneNodeData(nodeData.document);
+            // 1. & 2. Fetch Node Data and Image Export in Parallel
+            const [nodeData, imageResult] = await Promise.all([
+                this.figmaClient.getNode(args.file_key, args.node_id),
+                this.figmaClient.getNodeImage ?
+                    this.figmaClient.getNodeImage(args.file_key, args.node_id, 2.0) :
+                    Promise.resolve({ base64Data: "[Mock Image Data]", imageUrl: "", width: 0, height: 0 })
+            ]);
 
-            // 2. Fetch Image (Scale 2.0 for quality)
+            const pruned = pruneNodeData(nodeData.document, this.registry.getTokenResolver());
+
+            // 3. Optimize Image
             let imageBase64: string | null = null;
-            if (this.figmaClient.getNodeImage) {
-                const imageResult = await this.figmaClient.getNodeImage(args.file_key, args.node_id, 2.0);
+            if (imageResult && imageResult.base64Data && imageResult.base64Data !== "[Mock Image Data]") {
                 const buffer = Buffer.from(imageResult.base64Data, 'base64');
-
-                // 3. Optimize Image
                 const optimizedBuffer = await optimizeForCli(buffer);
                 imageBase64 = optimizedBuffer.toString('base64');
             } else {
-                imageBase64 = "[Mock Image Data]";
+                imageBase64 = imageResult?.base64Data || null;
             }
 
             return {

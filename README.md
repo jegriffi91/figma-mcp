@@ -21,11 +21,11 @@ The server exposes the following tools to MCP-compatible clients:
 
 | Tool | Description |
 |------|-------------|
-| `figma_to_swiftui` | Fetches a Figma node and converts it to SwiftUI. Use `handoff_mode: true` (default) for scaffolds or `false` for full implementations. |
-| `figma_to_compose` | Fetches a Figma node and converts it to Jetpack Compose. Uses separate `DESIGN_SYSTEM_ROOT_COMPOSE` configuration. |
-| `figma_get_node_data` | **LOW COST**. Retrieves standard metadata (name, text, simple colors) for exploring the node hierarchy. Use this first. |
-| `figma_get_node_snapshot` | **EXPENSIVE**. Retrieves a visual snapshot (WebP) AND metadata. Use only when visual layout/vibe is needed. Replaces `figma_vision_translate`. |
-| `discover_components` | Scans a Figma node/file for reusable components and adds them to your `components.json` configuration. |
+| `figma_get_node_data` | **STAGE 1: EXPLORE**. LOW COST. Retrieves pruned metadata (JSON). Use this first. |
+| `figma_get_node_snapshot` | **STAGE 2: VISUALIZE**. EXPENSIVE. Retrieves optimized WebP + metadata. Use for layout/vibe. |
+| `figma_to_swiftui` | **STAGE 3: GENERATE (SWIFT)**. Converts Figma node to SwiftUI code. |
+| `figma_to_compose` | **STAGE 3: GENERATE (KOTLIN)**. Converts Figma node to Jetpack Compose code. |
+| `discover_components` | **MAINTENANCE**. Scans Figma for reusable components to add to `components.json`. |
 
 ---
 

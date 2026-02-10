@@ -11,6 +11,10 @@ export class TranslatorRegistry {
         this.tokenResolver = tokenResolver;
     }
 
+    getTokenResolver(): DesignTokenResolver {
+        return this.tokenResolver;
+    }
+
 
     register(translator: ComponentTranslator) {
         this.translators.push(translator);
